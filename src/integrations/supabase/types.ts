@@ -152,6 +152,70 @@ export type Database = {
           },
         ]
       }
+      ai_usage_log: {
+        Row: {
+          company_id: string
+          created_at: string
+          feature: string
+          id: string
+          input_tokens: number
+          model: string
+          output_tokens: number
+          project_id: string | null
+          source_id: string | null
+          total_tokens: number | null
+          user_id: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          feature?: string
+          id?: string
+          input_tokens?: number
+          model: string
+          output_tokens?: number
+          project_id?: string | null
+          source_id?: string | null
+          total_tokens?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          feature?: string
+          id?: string
+          input_tokens?: number
+          model?: string
+          output_tokens?: number
+          project_id?: string | null
+          source_id?: string | null
+          total_tokens?: number | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_usage_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_usage_log_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_activity_status"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "ai_usage_log_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       call_notes: {
         Row: {
           call_date: string

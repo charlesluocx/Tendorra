@@ -69,7 +69,7 @@ async function parseTaggedEmail(taggedEmailId: string) {
 
   const { data: tagged, error: taggedError } = await admin
     .from("tagged_emails")
-    .select("id, company_id, project_id, connection_id, ms_message_id, subject, from_address, received_at")
+    .select("id, company_id, project_id, connection_id, ms_message_id, subject, from_address, received_at, tagged_by")
     .eq("id", taggedEmailId)
     .single();
   if (taggedError || !tagged || !tagged.connection_id) throw new Error("Tagged email not found.");
@@ -88,6 +88,17 @@ async function parseTaggedEmail(taggedEmailId: string) {
     from: tagged.from_address,
     receivedAt: tagged.received_at,
     body,
+  });
+
+  await admin.from("ai_usage_log").insert({
+    company_id: tagged.company_id,
+    project_id: tagged.project_id,
+    user_id: tagged.tagged_by,
+    feature: "email_parse",
+    source_id: tagged.id,
+    model: parsed.usage.model,
+    input_tokens: parsed.usage.inputTokens,
+    output_tokens: parsed.usage.outputTokens,
   });
 
   const { data: activity, error: activityError } = await admin

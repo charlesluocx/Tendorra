@@ -4,6 +4,11 @@ export type ParsedEmail = {
   summary: string;
   commitments: string[];
   key_dates: string[];
+  usage: {
+    model: string;
+    inputTokens: number;
+    outputTokens: number;
+  };
 };
 
 const SYSTEM_PROMPT = `You extract structured project-activity data from a construction/property project email for a busy project manager's activity feed. Read the email and respond with JSON only, no commentary, in exactly this shape:
@@ -29,6 +34,7 @@ export async function parseEmailWithAI(params: {
     .filter(Boolean)
     .join("\n");
 
+  const model = "claude-sonnet-5";
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -37,7 +43,7 @@ export async function parseEmailWithAI(params: {
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: "claude-sonnet-5",
+      model,
       max_tokens: 1024,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: userContent }],
@@ -58,5 +64,10 @@ export async function parseEmailWithAI(params: {
     summary: parsed.summary?.trim() || "No summary available.",
     commitments: Array.isArray(parsed.commitments) ? parsed.commitments.map(String) : [],
     key_dates: Array.isArray(parsed.key_dates) ? parsed.key_dates.map(String) : [],
+    usage: {
+      model,
+      inputTokens: Number(data.usage?.input_tokens ?? 0),
+      outputTokens: Number(data.usage?.output_tokens ?? 0),
+    },
   };
 }

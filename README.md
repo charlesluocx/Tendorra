@@ -114,6 +114,12 @@ not tenant-owned data, so they were left without a `company_id`.
 - `project_activity_status` — a view computing `is_stale` per project from
   `companies.stale_after_days` (defaults to 7), used for the "gone quiet"
   flag on the dashboard.
+- `ai_usage_log` — one row per AI call (currently just email parsing), with
+  `model`, `input_tokens`, `output_tokens`, and a generated `total_tokens`,
+  scoped to the company that triggered it. This is internal cost visibility
+  only for now — there's no cap or per-company billing wired to it yet (see
+  "What's not built yet"). Company members can query their own company's
+  rows directly; there's no dashboard UI for it yet.
 
 ## What's not built yet
 
@@ -131,7 +137,9 @@ existing consultant/RFQ tender flow. Not in this pass:
   dashboard.
 - **Stripe billing / plan enforcement** — signup and per-company isolation
   are built (see "Signup, teams, and branding" above); billing and usage
-  caps per plan are not.
+  caps per plan are not. `ai_usage_log` (see "Key tables") tracks token
+  spend per company today, but nothing acts on it yet — that's the natural
+  next step once pricing per external company is decided.
 - **Invite emails** — invites currently produce a link shown in the UI to
   copy and send manually; wiring up an email provider (e.g. Resend, already
   referenced elsewhere in this codebase's consultant-invite flow) to send
