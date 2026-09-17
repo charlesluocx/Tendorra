@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/integrations/supabase/types";
 
-const PUBLIC_PATHS = ["/login", "/signup", "/auth"];
+const PUBLIC_PATHS = ["/login", "/signup", "/invite", "/auth"];
 
 // Refreshes the Supabase auth session on every request and redirects signed-out
 // users away from protected pages. Mirrors the standard @supabase/ssr Next.js

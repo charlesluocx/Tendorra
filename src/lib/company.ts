@@ -10,3 +10,19 @@ export async function getCurrentCompanyId(supabase: SupabaseClient<Database>): P
   if (error || !data) throw new Error(error?.message ?? "You're not part of a company yet.");
   return data;
 }
+
+export type Membership = { companyId: string; role: "owner" | "admin" | "member" };
+
+export async function getCurrentMembership(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+): Promise<Membership | null> {
+  const { data } = await supabase
+    .from("company_users")
+    .select("company_id, role")
+    .eq("user_id", userId)
+    .limit(1)
+    .maybeSingle();
+  if (!data) return null;
+  return { companyId: data.company_id, role: data.role as Membership["role"] };
+}

@@ -209,30 +209,86 @@ export type Database = {
       }
       companies: {
         Row: {
+          brand_primary: string | null
+          brand_secondary: string | null
           created_at: string
           id: string
+          logo_url: string | null
           name: string
           plan: string
           slug: string | null
           stale_after_days: number
+          website: string | null
         }
         Insert: {
+          brand_primary?: string | null
+          brand_secondary?: string | null
           created_at?: string
           id?: string
+          logo_url?: string | null
           name: string
           plan?: string
           slug?: string | null
           stale_after_days?: number
+          website?: string | null
         }
         Update: {
+          brand_primary?: string | null
+          brand_secondary?: string | null
           created_at?: string
           id?: string
+          logo_url?: string | null
           name?: string
           plan?: string
           slug?: string | null
           stale_after_days?: number
+          website?: string | null
         }
         Relationships: []
+      }
+      company_invites: {
+        Row: {
+          accepted_at: string | null
+          company_id: string
+          created_at: string
+          email: string
+          id: string
+          invited_by: string | null
+          role: string
+          status: string
+          token: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          company_id: string
+          created_at?: string
+          email: string
+          id?: string
+          invited_by?: string | null
+          role?: string
+          status?: string
+          token: string
+        }
+        Update: {
+          accepted_at?: string | null
+          company_id?: string
+          created_at?: string
+          email?: string
+          id?: string
+          invited_by?: string | null
+          role?: string
+          status?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_invites_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       company_users: {
         Row: {

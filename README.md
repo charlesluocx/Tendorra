@@ -20,8 +20,9 @@ cp .env.example .env.local   # fill in the values described below
 npm run dev
 ```
 
-Open http://localhost:3000, sign up, and you'll be auto-joined to the
-company's single team (see "Multi-tenancy" below).
+Open http://localhost:3000/signup to create a company (you become its
+`owner`), or open an `/invite/<token>` link from an owner/admin to join an
+existing one. See "Signup, teams, and branding" below.
 
 ## Environment variables
 
@@ -51,21 +52,47 @@ Supabase CLI (`supabase db push`) or the SQL editor in the dashboard.
 Every tenant-owned table (`projects` and everything that hangs off a
 project — activity, call notes, action items, checklist items, tagged
 emails, connected inboxes) carries a `company_id` and is scoped by Row Level
-Security through `public.is_company_member(company_id)`. Phase 1 runs a
-single company; new signups auto-join it (see `handle_new_auth_user` in
-`20260917140000_activity_tracking.sql`). Turning this into a self-serve,
-billed product (Phase 2) is a matter of:
-
-1. Building a signup flow that creates a new `companies` row instead of
-   relying on the single-company auto-join trigger.
-2. Adding Stripe billing + plan/usage-cap enforcement.
-3. Everything else — RLS, the schema, the auto-flag rule — already works
-   per-company with no further schema changes.
+Security through `public.is_company_member(company_id)`. Multiple companies
+can exist side by side with no cross-visibility. Turning this into a billed
+product (Stripe, plan/usage caps) is the only piece Phase 2 still needs —
+RLS, the schema, and self-serve signup already work per-company.
 
 The `consultant_categories` and `consultants` tables are the one
 intentional exception: they're a cross-company marketplace/taxonomy by
 design (see the existing "true" SELECT policies from before this module),
 not tenant-owned data, so they were left without a `company_id`.
+
+### Signup, teams, and branding
+
+- **`/signup`** — anyone can create a company here. It becomes the caller's
+  company (`companies` row + a `company_users` row with `role = 'owner'`),
+  created together in `src/app/signup/actions.ts` via the service-role
+  client (an owner can't satisfy the company-membership RLS check before
+  their own membership row exists, so this one write path is trusted server
+  code, same pattern as the OAuth token writes).
+- Owner signup takes an optional **company website**. If given,
+  `src/lib/branding/extract.ts` best-effort fetches it and pulls a logo
+  (favicon/apple-touch-icon/`og:image` from the HTML, falling back to
+  Google's favicon service so there's always something) and a primary brand
+  color (the page's `theme-color` meta tag, or failing that the average
+  color of the logo image via `jimp`). A secondary shade and a readable
+  text color are derived from that primary in `src/lib/branding/color.ts`.
+  None of this blocks signup — a slow or unreachable site just yields no
+  branding, and the dashboard uses its default theme.
+- The dashboard layout (`src/app/(dashboard)/layout.tsx`) reads the
+  signed-in user's company and, if it has a `brand_primary`, overrides the
+  `--primary`/`--ring`/`--sidebar-primary` CSS custom properties for that
+  request and renders the logo in the header — so the whole shadcn/ui theme
+  re-colors per company with no component changes.
+- **`/settings/team`** — owners/admins invite by email (`company_invites`,
+  one row per pending invite, unique per company+email while pending) and
+  can change existing members' roles. There's no email provider configured,
+  so an invite produces a shareable `/invite/<token>` link shown directly in
+  the UI (the same "copy this link" pattern the existing consultant-invite
+  flow already used) rather than an email being sent.
+- **`/invite/[token]`** — public page; the invitee sets a name and password,
+  which creates their account and inserts their `company_users` row with
+  the role the invite specified, scoped to that one company only.
 
 ### Key tables
 
@@ -102,5 +129,10 @@ existing consultant/RFQ tender flow. Not in this pass:
 - **Deployment** — pick a host (Vercel is the natural fit for Next.js),
   connect this repo, and set the environment variables above in its
   dashboard.
-- **Stripe billing / Phase 2 self-serve signup** — see "Multi-tenancy" above
-  for what's already in place versus what Phase 2 still needs.
+- **Stripe billing / plan enforcement** — signup and per-company isolation
+  are built (see "Signup, teams, and branding" above); billing and usage
+  caps per plan are not.
+- **Invite emails** — invites currently produce a link shown in the UI to
+  copy and send manually; wiring up an email provider (e.g. Resend, already
+  referenced elsewhere in this codebase's consultant-invite flow) to send
+  it automatically is a small follow-up.
