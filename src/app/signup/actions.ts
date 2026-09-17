@@ -46,7 +46,7 @@ export async function createCompanyAndOwner(
     .insert({
       name: companyName,
       slug: uniqueSlug(companyName),
-      plan: "trial",
+      plan: "free",
       website: website || null,
       logo_url: branding.logoUrl,
       brand_primary: branding.primaryColor,
