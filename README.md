@@ -24,6 +24,20 @@ Open http://localhost:3000/signup to create a company (you become its
 `owner`), or open an `/invite/<token>` link from an owner/admin to join an
 existing one. See "Signup, teams, and branding" below.
 
+### Internal testing (staff who aren't on your machine)
+
+- **Same office network:** `npm run dev -- -H 0.0.0.0`, then have them open
+  `http://<your-machine's-LAN-IP>:3000` (find the IP with `ipconfig` /
+  `ifconfig`). May need to allow port 3000 through your firewall.
+- **Remote/distributed staff:** `./scripts/tunnel.sh` (needs
+  [`cloudflared`](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)
+  installed) runs the dev server and a Cloudflare Tunnel together, printing
+  a shareable `https://*.trycloudflare.com` URL — no deployment, no port
+  forwarding. Keep the terminal open for as long as staff are testing.
+
+Either way this hits your live Supabase project, so treat it as real data —
+worth using throwaway test accounts/companies rather than production ones.
+
 ## Environment variables
 
 See `.env.example` for the full list and where to get each value. In short:
