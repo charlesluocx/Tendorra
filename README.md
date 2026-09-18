@@ -147,6 +147,11 @@ not tenant-owned data, so they were left without a `company_id`.
 - **`/invite/[token]`** — public page; the invitee sets a name and password,
   which creates their account and inserts their `company_users` row with
   the role the invite specified, scoped to that one company only.
+- **`/settings/company`** — owners/admins can edit the company name, website
+  (re-running the branding extraction above on change), and the "gone
+  quiet" threshold (`stale_after_days`, used by both the dashboard badge and
+  the reminder emails — see "Reminders" below). There was previously no way
+  to change `stale_after_days` short of editing the row directly.
 
 ### Key tables
 

@@ -57,6 +57,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
             {company?.name ?? "Tendorra"}
           </Link>
           <div className="flex items-center gap-3">
+            <Link href="/settings/company" className="text-sm text-muted-foreground hover:text-foreground">
+              Company
+            </Link>
             <Link href="/settings/team" className="text-sm text-muted-foreground hover:text-foreground">
               Team
             </Link>
