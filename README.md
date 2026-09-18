@@ -41,6 +41,31 @@ The app runs and lets you use call notes, manual updates, action items, and
 the checklist without any of the Microsoft/Anthropic keys — those are only
 needed for the email-tagging flow.
 
+## Deployment
+
+This app runs on **Cloudflare Workers** via the [OpenNext Cloudflare
+adapter](https://opennext.js.org/cloudflare) (`@opennextjs/cloudflare` +
+`wrangler`), not Vercel — Cloudflare Workers' free tier (100k
+requests/day) allows commercial use with no plan upgrade required, unlike
+Vercel's Hobby tier, which is personal/non-commercial only. That matters
+here since this module is headed toward a paid multi-tenant product
+(Phase 2).
+
+```sh
+npx wrangler login          # one-time: connect your Cloudflare account
+npm run deploy               # builds with OpenNext and deploys the Worker
+```
+
+Before your first deploy, set the same variables from `.env.example` as
+Worker secrets (`npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY`, etc.) —
+`wrangler.jsonc` doesn't commit secret values, only the non-secret config.
+`npm run preview` builds and runs the Worker locally against
+`http://localhost:8787` using the real Workers runtime (closer to
+production than `next dev`, which uses Node directly).
+
+Config lives in `wrangler.jsonc` and `open-next.config.ts`; both are
+intentionally minimal — no KV/D1/R2 bindings are used yet.
+
 ## Database
 
 All schema changes are plain SQL migrations in `supabase/migrations/`,
@@ -132,9 +157,9 @@ existing consultant/RFQ tender flow. Not in this pass:
 - The **public tender board** (a separate area where owners can flag a job
   public for consultants to browse) — the existing private
   invite-a-consultant flow is untouched and still works.
-- **Deployment** — pick a host (Vercel is the natural fit for Next.js),
-  connect this repo, and set the environment variables above in its
-  dashboard.
+- **Going live on Cloudflare** — the adapter/config are wired up (see
+  "Deployment" below); connecting a real Cloudflare account and running
+  `npm run deploy` is still a manual, one-time step.
 - **Stripe billing / plan enforcement** — signup and per-company isolation
   are built (see "Signup, teams, and branding" above); billing and usage
   caps per plan are not. `ai_usage_log` (see "Key tables") tracks token
