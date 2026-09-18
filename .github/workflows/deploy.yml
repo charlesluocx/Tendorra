@@ -1,0 +1,34 @@
+name: Deploy to Cloudflare Workers
+
+on:
+  push:
+    branches:
+      - claude/keen-volta-1lwssa
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      - name: Build for Cloudflare
+        run: bunx opennextjs-cloudflare build
+        env:
+          # Public/publishable values only — safe to expose to the browser by
+          # design (see .env.example). Server-only secrets (service role key,
+          # Microsoft/Anthropic keys) are Worker secrets set once via
+          # `wrangler secret put`, not needed at build time.
+          NEXT_PUBLIC_SUPABASE_URL: https://jwmduxiykcbarlktxtrb.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_BLF5_fxJmUgsc-BYszClaQ_vPSfDipX
+
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy

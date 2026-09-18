@@ -59,6 +59,20 @@ npm run deploy               # builds with OpenNext and deploys the Worker
 Before your first deploy, set the same variables from `.env.example` as
 Worker secrets (`npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY`, etc.) —
 `wrangler.jsonc` doesn't commit secret values, only the non-secret config.
+
+### Auto-deploy on push
+
+`.github/workflows/deploy.yml` redeploys on every push to
+`claude/keen-volta-1lwssa`. It needs two **GitHub Actions repo secrets**
+(Settings → Secrets and variables → Actions, not committed anywhere):
+
+- `CLOUDFLARE_API_TOKEN` — a token scoped to `Account.Workers Scripts: Edit`
+  (the "Edit Cloudflare Workers" template works)
+- `CLOUDFLARE_ACCOUNT_ID` — from the Cloudflare dashboard sidebar
+
+Server-only secrets (`SUPABASE_SERVICE_ROLE_KEY`, etc.) still go through
+`wrangler secret put` once, directly against the Worker — the workflow
+doesn't touch those.
 `npm run preview` builds and runs the Worker locally against
 `http://localhost:8787` using the real Workers runtime (closer to
 production than `next dev`, which uses Node directly).
