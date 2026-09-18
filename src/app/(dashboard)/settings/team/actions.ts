@@ -4,8 +4,9 @@ import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMembership } from "@/lib/company";
+import { sendInviteEmail } from "@/lib/email/send-invite";
 
-export type InviteState = { error: string | null; inviteUrl?: string };
+export type InviteState = { error: string | null; inviteUrl?: string; emailed?: boolean };
 
 function makeToken() {
   return randomBytes(24).toString("hex");
@@ -47,8 +48,23 @@ export async function inviteEmployee(_prevState: InviteState, formData: FormData
     };
   }
 
+  const inviteUrl = `${origin.replace(/\/$/, "")}/invite/${token}`;
+
+  const [{ data: company }, { data: inviterProfile }] = await Promise.all([
+    supabase.from("companies").select("name").eq("id", membership.companyId).single(),
+    supabase.from("profiles").select("full_name, email").eq("id", user.id).single(),
+  ]);
+
+  const emailed = await sendInviteEmail({
+    to: email,
+    companyName: company?.name ?? "your company",
+    inviterName: inviterProfile?.full_name || inviterProfile?.email || "A teammate",
+    role,
+    inviteUrl,
+  });
+
   revalidatePath("/settings/team");
-  return { error: null, inviteUrl: `${origin.replace(/\/$/, "")}/invite/${token}` };
+  return { error: null, inviteUrl, emailed };
 }
 
 export async function revokeInvite(formData: FormData) {

@@ -823,6 +823,7 @@ export type Database = {
           created_at: string
           current_phase: string | null
           id: string
+          last_reminder_sent_at: string | null
           name: string
           owner_id: string
           postcode: string | null
@@ -835,6 +836,7 @@ export type Database = {
           created_at?: string
           current_phase?: string | null
           id?: string
+          last_reminder_sent_at?: string | null
           name: string
           owner_id: string
           postcode?: string | null
@@ -847,6 +849,7 @@ export type Database = {
           created_at?: string
           current_phase?: string | null
           id?: string
+          last_reminder_sent_at?: string | null
           name?: string
           owner_id?: string
           postcode?: string | null
@@ -1089,13 +1092,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "project_activity_status"
             referencedColumns: ["project_id"]
-          },
-          {
-            foreignKeyName: "tagged_emails_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
           },
         ]
       }
