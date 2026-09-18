@@ -139,10 +139,11 @@ not tenant-owned data, so they were left without a `company_id`.
   re-colors per company with no component changes.
 - **`/settings/team`** — owners/admins invite by email (`company_invites`,
   one row per pending invite, unique per company+email while pending) and
-  can change existing members' roles. There's no email provider configured,
-  so an invite produces a shareable `/invite/<token>` link shown directly in
-  the UI (the same "copy this link" pattern the existing consultant-invite
-  flow already used) rather than an email being sent.
+  can change existing members' roles. If `RESEND_API_KEY` is set (see
+  `.env.example`), the invite is also emailed via
+  `src/lib/email/send-invite.ts`; either way, the `/invite/<token>` link is
+  always shown directly in the UI too, so there's always a fallback to copy
+  and send manually if email sending isn't configured or fails.
 - **`/invite/[token]`** — public page; the invitee sets a name and password,
   which creates their account and inserts their `company_users` row with
   the role the invite specified, scoped to that one company only.
@@ -193,7 +194,3 @@ existing consultant/RFQ tender flow. Not in this pass:
   caps per plan are not. `ai_usage_log` (see "Key tables") tracks token
   spend per company today, but nothing acts on it yet — that's the natural
   next step once pricing per external company is decided.
-- **Invite emails** — invites currently produce a link shown in the UI to
-  copy and send manually; wiring up an email provider (e.g. Resend, already
-  referenced elsewhere in this codebase's consultant-invite flow) to send
-  it automatically is a small follow-up.

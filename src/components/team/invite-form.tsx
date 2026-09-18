@@ -33,7 +33,11 @@ export function InviteForm() {
       {state.error && <p className="w-full text-sm text-destructive">{state.error}</p>}
       {state.inviteUrl && (
         <div className="w-full rounded-md border border-border bg-muted/40 p-3 text-xs">
-          <p className="text-foreground">Share this link with them — no email was sent:</p>
+          <p className="text-foreground">
+            {state.emailed
+              ? "We emailed them an invite. You can also share this link directly:"
+              : "Share this link with them — no email was sent:"}
+          </p>
           <p className="mt-1 break-all text-muted-foreground">{state.inviteUrl}</p>
         </div>
       )}
