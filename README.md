@@ -167,7 +167,10 @@ not tenant-owned data, so they were left without a `company_id`.
   AI-parsing pipeline into `activity_log`.
 - `project_activity_status` — a view computing `is_stale` per project from
   `companies.stale_after_days` (defaults to 7), used for the "gone quiet"
-  flag on the dashboard.
+  flag on the dashboard and for the stale-project reminder emails (see
+  "Reminders" below). `projects.last_reminder_sent_at` tracks the last time
+  each project's owners/admins were emailed about it, so the job below
+  doesn't re-send every run.
 - `ai_usage_log` — one row per AI call (currently just email parsing), with
   `model`, `input_tokens`, `output_tokens`, and a generated `total_tokens`,
   scoped to the company that triggered it. This is internal cost visibility
@@ -175,14 +178,34 @@ not tenant-owned data, so they were left without a `company_id`.
   "What's not built yet"). Company members can query their own company's
   rows directly; there's no dashboard UI for it yet.
 
+## Reminders
+
+`POST /api/cron/stale-reminders` finds every project currently flagged
+`is_stale` (via `project_activity_status`) that hasn't had a reminder sent
+in the last 24 hours, and emails each affected company's owners/admins a
+summary via Resend (`src/lib/email/send-stale-reminder.ts`) — a proactive
+nudge on top of the dashboard's "Gone quiet" badge, not a replacement for
+it; if `RESEND_API_KEY` isn't set, the route still runs (and still updates
+`last_reminder_sent_at`) but just doesn't send anything.
+
+The route is protected by a shared secret (`CRON_SECRET`) since it acts
+across every company with the service-role client — anyone calling it
+without the right `Authorization: Bearer <CRON_SECRET>` header gets a 401.
+`.github/workflows/stale-reminders.yml` calls it hourly; it needs an
+**`APP_URL` repo variable** (your deployed app's URL, used both to call the
+route and to build the links inside the reminder emails) and a
+**`CRON_SECRET` repo secret** (any random string, e.g. from
+`openssl rand -hex 32` — set the same value in your Worker's env via
+`wrangler secret put CRON_SECRET`). Without either, the workflow run fails
+fast with a clear message instead of silently no-op'ing.
+
 ## What's not built yet
 
 This covers Phase 1 of the module (activity feed, call notes, action items,
-checklist, email tagging + AI parsing, the stale-project flag) on top of the
-existing consultant/RFQ tender flow. Not in this pass:
+checklist, email tagging + AI parsing, the stale-project flag and its
+reminder emails) on top of the existing consultant/RFQ tender flow. Not in
+this pass:
 
-- A push/email/Slack **reminders engine** — today the "gone quiet" flag is
-  surfaced in the dashboard UI only, not proactively pushed to anyone.
 - The **public tender board** (a separate area where owners can flag a job
   public for consultants to browse) — the existing private
   invite-a-consultant flow is untouched and still works.

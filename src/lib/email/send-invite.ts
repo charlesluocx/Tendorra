@@ -1,4 +1,5 @@
 import "server-only";
+import { sendEmail } from "./resend";
 
 function renderInviteHtml(params: {
   companyName: string;
@@ -24,8 +25,6 @@ function renderInviteHtml(params: {
 </html>`;
 }
 
-// Best-effort: a missing API key or a failed send never blocks invite
-// creation — the caller always has the raw inviteUrl to share manually.
 export async function sendInviteEmail(params: {
   to: string;
   companyName: string;
@@ -33,27 +32,9 @@ export async function sendInviteEmail(params: {
   role: string;
   inviteUrl: string;
 }): Promise<boolean> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) return false;
-
-  const from = process.env.RESEND_FROM_EMAIL || "Tendorra <onboarding@resend.dev>";
-
-  try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from,
-        to: params.to,
-        subject: `${params.inviterName} invited you to join ${params.companyName} on Tendorra`,
-        html: renderInviteHtml(params),
-      }),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
+  return sendEmail({
+    to: params.to,
+    subject: `${params.inviterName} invited you to join ${params.companyName} on Tendorra`,
+    html: renderInviteHtml(params),
+  });
 }
