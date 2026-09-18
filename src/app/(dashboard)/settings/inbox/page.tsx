@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { disconnectInbox } from "./actions";
 
 export default async function InboxSettingsPage({
@@ -55,6 +56,15 @@ export default async function InboxSettingsPage({
             </Button>
           )}
         </div>
+
+        <Alert className="mt-4 border-border bg-muted/40">
+          <AlertDescription className="text-muted-foreground">
+            Read-only access: we can only view your mail, never send, delete, or edit it. You
+            browse your own recent messages to pick one, and only the emails <em>you</em> choose
+            to tag to a project are stored or sent to AI for summarizing — everything else stays
+            in your inbox, untouched. Disconnect at any time.
+          </AlertDescription>
+        </Alert>
       </div>
 
       <div className="mt-8">

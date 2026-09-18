@@ -66,6 +66,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <Link href="/settings/inbox" className="text-sm text-muted-foreground hover:text-foreground">
               Inbox settings
             </Link>
+            <Link href="/settings/usage" className="text-sm text-muted-foreground hover:text-foreground">
+              Usage
+            </Link>
             <span className="hidden text-sm text-muted-foreground sm:inline">{user.email}</span>
             <form action={logout}>
               <Button type="submit" variant="outline" size="sm">

@@ -180,8 +180,8 @@ not tenant-owned data, so they were left without a `company_id`.
   `model`, `input_tokens`, `output_tokens`, and a generated `total_tokens`,
   scoped to the company that triggered it. This is internal cost visibility
   only for now — there's no cap or per-company billing wired to it yet (see
-  "What's not built yet"). Company members can query their own company's
-  rows directly; there's no dashboard UI for it yet.
+  "What's not built yet"). Viewable at **`/settings/usage`** (any company
+  member; shows this month's token total and the last 100 AI calls).
 
 ## Reminders
 
