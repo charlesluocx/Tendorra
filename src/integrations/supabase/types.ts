@@ -310,6 +310,53 @@ export type Database = {
         }
         Relationships: []
       }
+      company_gmail_inbox: {
+        Row: {
+          access_token: string | null
+          company_id: string
+          connected_at: string
+          connected_by: string | null
+          email_address: string
+          id: string
+          last_synced_at: string | null
+          refresh_token: string | null
+          status: string
+          token_expires_at: string | null
+        }
+        Insert: {
+          access_token?: string | null
+          company_id: string
+          connected_at?: string
+          connected_by?: string | null
+          email_address: string
+          id?: string
+          last_synced_at?: string | null
+          refresh_token?: string | null
+          status?: string
+          token_expires_at?: string | null
+        }
+        Update: {
+          access_token?: string | null
+          company_id?: string
+          connected_at?: string
+          connected_by?: string | null
+          email_address?: string
+          id?: string
+          last_synced_at?: string | null
+          refresh_token?: string | null
+          status?: string
+          token_expires_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_gmail_inbox_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       company_invites: {
         Row: {
           accepted_at: string | null
@@ -770,6 +817,77 @@ export type Database = {
           },
         ]
       }
+      project_email_events: {
+        Row: {
+          activity_id: string | null
+          company_id: string
+          created_at: string
+          from_address: string | null
+          gmail_message_id: string
+          id: string
+          parse_status: string
+          parsed_at: string | null
+          project_id: string | null
+          received_at: string | null
+          subject: string | null
+        }
+        Insert: {
+          activity_id?: string | null
+          company_id: string
+          created_at?: string
+          from_address?: string | null
+          gmail_message_id: string
+          id?: string
+          parse_status?: string
+          parsed_at?: string | null
+          project_id?: string | null
+          received_at?: string | null
+          subject?: string | null
+        }
+        Update: {
+          activity_id?: string | null
+          company_id?: string
+          created_at?: string
+          from_address?: string | null
+          gmail_message_id?: string
+          id?: string
+          parse_status?: string
+          parsed_at?: string | null
+          project_id?: string | null
+          received_at?: string | null
+          subject?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_email_events_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "activity_log"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_email_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_email_events_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_activity_status"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "project_email_events_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_phases: {
         Row: {
           company_id: string
@@ -822,6 +940,7 @@ export type Database = {
           company_id: string
           created_at: string
           current_phase: string | null
+          email_code: string
           id: string
           last_reminder_sent_at: string | null
           name: string
@@ -835,6 +954,7 @@ export type Database = {
           company_id: string
           created_at?: string
           current_phase?: string | null
+          email_code?: string
           id?: string
           last_reminder_sent_at?: string | null
           name: string
@@ -848,6 +968,7 @@ export type Database = {
           company_id?: string
           created_at?: string
           current_phase?: string | null
+          email_code?: string
           id?: string
           last_reminder_sent_at?: string | null
           name?: string
