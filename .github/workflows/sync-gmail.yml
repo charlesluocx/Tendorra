@@ -1,0 +1,21 @@
+name: Sync project-timeline Gmail inbox
+
+on:
+  schedule:
+    # Every 10 minutes — keeps the timeline close to real-time without
+    # hammering the Gmail API; the route dedupes by gmail_message_id either way.
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call the sync-gmail endpoint
+        run: |
+          if [ -z "${{ vars.APP_URL }}" ] || [ -z "${{ secrets.CRON_SECRET }}" ]; then
+            echo "APP_URL repo variable or CRON_SECRET repo secret not set — skipping." >&2
+            exit 1
+          fi
+          curl --fail-with-body -sS -X POST "${{ vars.APP_URL }}/api/cron/sync-gmail" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"

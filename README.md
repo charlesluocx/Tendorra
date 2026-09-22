@@ -49,11 +49,14 @@ See `.env.example` for the full list and where to get each value. In short:
 - `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` / `MICROSOFT_TENANT_ID` —
   from an Entra ID (Azure AD) app registration. Required for the "Connect
   Outlook" flow under Inbox Settings.
-- `ANTHROPIC_API_KEY` — required for AI parsing of tagged emails.
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — from a Google Cloud OAuth
+  client (Gmail API enabled). Required for the shared project-timeline
+  inbox — see "Project timeline" below.
+- `ANTHROPIC_API_KEY` — required for AI parsing of tagged/synced emails.
 
 The app runs and lets you use call notes, manual updates, action items, and
-the checklist without any of the Microsoft/Anthropic keys — those are only
-needed for the email-tagging flow.
+the checklist without any of the Microsoft/Google/Anthropic keys — those are
+only needed for the email flows.
 
 ## Deployment
 
@@ -182,6 +185,39 @@ not tenant-owned data, so they were left without a `company_id`.
   only for now — there's no cap or per-company billing wired to it yet (see
   "What's not built yet"). Viewable at **`/settings/usage`** (any company
   member; shows this month's token total and the last 100 AI calls).
+- `company_gmail_inbox` — the one shared Gmail connection per company (see
+  "Project timeline" below); tokens are service-role-only, same pattern as
+  `connected_inboxes`.
+- `project_email_events` — a processing log of every Gmail message pulled
+  in, deduped by `gmail_message_id`, with `parse_status` (`parsed` /
+  `failed` / `unmatched` if no project's `email_code` was found in the
+  message).
+
+## Project timeline
+
+Every project gets a unique, auto-generated `email_code` (`projects` table)
+used as a Gmail "+" tag, so staff can build a project's timeline just by
+forwarding or CCing an email — no per-person inbox connection, no manual
+tagging.
+
+- **`/settings/inbox`** — an owner/admin connects **one shared Gmail inbox**
+  for the whole company (Google OAuth, `src/lib/gmail.ts` +
+  `src/app/api/auth/gmail/start`+`callback`). This is separate from, and in
+  addition to, the existing per-staff Outlook connection on the same page.
+- Each project's page shows its forwarding address (e.g.
+  `company-timeline+A1B2C3@gmail.com`) with a copy button. Staff forward or
+  CC relevant emails there.
+- `POST /api/cron/sync-gmail` (same protected-by-`CRON_SECRET` pattern as
+  `/api/cron/stale-reminders`, called every 10 minutes by
+  `.github/workflows/sync-gmail.yml`) polls the shared inbox, matches each
+  new message's `+code` against a project, and runs matched emails through
+  the same AI parsing pipeline as tagged Outlook emails, straight into
+  `activity_log`.
+- The **Timeline** section on each project page (`src/components/project/
+  timeline.tsx`) plots that project's `activity_log` entries alongside its
+  checklist milestones (both reached — `completed_at` — and upcoming —
+  `expected_at`) as one chronological visual timeline, separate from the
+  more detailed Activity Feed list below it.
 
 ## Reminders
 
