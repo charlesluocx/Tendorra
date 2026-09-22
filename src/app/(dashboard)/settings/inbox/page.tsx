@@ -1,8 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentMembership } from "@/lib/company";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { disconnectInbox } from "./actions";
+import { disconnectInbox, disconnectGmailInbox } from "./actions";
 
 export default async function InboxSettingsPage({
   searchParams,
@@ -15,18 +16,30 @@ export default async function InboxSettingsPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: connections } = await supabase
-    .from("connected_inboxes")
-    .select("id, user_id, email_address, status, connected_at, last_synced_at")
-    .order("connected_at", { ascending: false });
+  const membership = user ? await getCurrentMembership(supabase, user.id) : null;
+  const canManageGmail = membership !== null && ["owner", "admin"].includes(membership.role);
+
+  const [{ data: connections }, { data: gmailInbox }] = await Promise.all([
+    supabase
+      .from("connected_inboxes")
+      .select("id, user_id, email_address, status, connected_at, last_synced_at")
+      .order("connected_at", { ascending: false }),
+    supabase
+      .from("company_gmail_inbox")
+      .select("email_address, status, connected_at, last_synced_at")
+      .maybeSingle(),
+  ]);
 
   const myConnection = (connections ?? []).find((c) => c.user_id === user?.id && c.status === "connected");
+  const gmailConnected = gmailInbox?.status === "connected";
+  const [gmailLocalPart, gmailDomain] = (gmailInbox?.email_address ?? "").split("@");
 
   return (
     <div className="mx-auto max-w-xl">
       <h1 className="text-2xl font-semibold tracking-tight text-foreground">Connected Inboxes</h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        Connect your Outlook inbox so you can tag project emails straight into the activity feed.
+        A shared inbox builds every project&apos;s timeline automatically. You can also connect
+        your own Outlook to manually tag individual emails.
       </p>
 
       {error && (
@@ -38,7 +51,47 @@ export default async function InboxSettingsPage({
       <div className="mt-6 rounded-md border border-border p-4">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-sm font-medium text-foreground">Your inbox</p>
+            <p className="text-sm font-medium text-foreground">Project-timeline inbox</p>
+            <p className="text-sm text-muted-foreground">
+              {gmailConnected ? gmailInbox!.email_address : "Not connected"}
+            </p>
+          </div>
+          {gmailConnected ? (
+            canManageGmail && (
+              <form action={disconnectGmailInbox}>
+                <Button type="submit" variant="outline" size="sm">
+                  Disconnect
+                </Button>
+              </form>
+            )
+          ) : (
+            canManageGmail && (
+              <Button asChild size="sm">
+                <a href="/api/auth/gmail/start">Connect Gmail</a>
+              </Button>
+            )
+          )}
+        </div>
+
+        {gmailConnected ? (
+          <p className="mt-4 text-sm text-muted-foreground">
+            Forward or CC a project&apos;s address (shown on that project&apos;s page — it looks
+            like <span className="font-mono text-foreground">{gmailLocalPart}+CODE@{gmailDomain}</span>)
+            to log that email on its timeline automatically. Checked every few minutes.
+          </p>
+        ) : (
+          <p className="mt-4 text-sm text-muted-foreground">
+            {canManageGmail
+              ? "One shared inbox for the whole company. Staff forward or CC relevant emails to a project's address to build its timeline automatically — no per-person setup needed."
+              : "Ask an owner or admin to connect this."}
+          </p>
+        )}
+      </div>
+
+      <div className="mt-6 rounded-md border border-border p-4">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-foreground">Your personal inbox</p>
             <p className="text-sm text-muted-foreground">
               {myConnection ? myConnection.email_address : "Not connected"}
             </p>

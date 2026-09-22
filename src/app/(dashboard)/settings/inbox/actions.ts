@@ -3,6 +3,27 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getCurrentCompanyId, getCurrentMembership } from "@/lib/company";
+
+export async function disconnectGmailInbox() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const membership = await getCurrentMembership(supabase, user.id);
+  if (!membership || !["owner", "admin"].includes(membership.role)) return;
+
+  const companyId = await getCurrentCompanyId(supabase);
+  const admin = createAdminClient();
+  await admin
+    .from("company_gmail_inbox")
+    .update({ status: "disconnected", access_token: null, refresh_token: null })
+    .eq("company_id", companyId);
+
+  revalidatePath("/settings/inbox");
+}
 
 export async function disconnectInbox(formData: FormData) {
   const id = String(formData.get("id") ?? "");

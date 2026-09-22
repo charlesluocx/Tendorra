@@ -7,6 +7,8 @@ import { CallNoteForm } from "@/components/project/call-note-form";
 import { ManualUpdateForm } from "@/components/project/manual-update-form";
 import { ActionItemForm } from "@/components/project/action-item-form";
 import { StatusSelect } from "@/components/project/status-select";
+import { ProjectTimeline, type TimelineEvent } from "@/components/project/timeline";
+import { CopyEmailButton } from "@/components/project/copy-email-button";
 import { setActionItemStatus, setChecklistItemStatus } from "./actions";
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -23,7 +25,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     await Promise.all([
       supabase
         .from("projects")
-        .select("id, name, address, postcode, current_phase")
+        .select("id, company_id, name, address, postcode, current_phase, email_code")
         .eq("id", id)
         .maybeSingle(),
       supabase
@@ -39,13 +41,59 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         .order("created_at", { ascending: false }),
       supabase
         .from("project_checklist_items")
-        .select("id, title, status, expected_at, position, phase_id, lifecycle_phases(name, position)")
+        .select(
+          "id, title, status, expected_at, completed_at, position, phase_id, lifecycle_phases(name, position)",
+        )
         .eq("project_id", id)
         .order("position", { ascending: true }),
       supabase.from("profiles").select("id, email, full_name"),
     ]);
 
   if (!project) notFound();
+
+  const { data: gmailInbox } = await supabase
+    .from("company_gmail_inbox")
+    .select("email_address, status")
+    .eq("company_id", project.company_id)
+    .maybeSingle();
+
+  const projectEmailAddress =
+    gmailInbox?.status === "connected"
+      ? gmailInbox.email_address.replace("@", `+${project.email_code}@`)
+      : null;
+
+  const timelineEvents: TimelineEvent[] = [
+    ...(activity ?? []).map((entry) => ({
+      id: entry.id,
+      date: entry.occurred_at,
+      kind: entry.source_type as TimelineEvent["kind"],
+      title: entry.summary,
+    })),
+    ...(checklist ?? [])
+      .filter((item) => item.completed_at)
+      .map((item) => {
+        const phase = item.lifecycle_phases as unknown as { name: string } | null;
+        return {
+          id: `${item.id}-done`,
+          date: item.completed_at!,
+          kind: "milestone_done" as const,
+          title: item.title,
+          subtitle: phase?.name,
+        };
+      }),
+    ...(checklist ?? [])
+      .filter((item) => item.expected_at && item.status !== "done")
+      .map((item) => {
+        const phase = item.lifecycle_phases as unknown as { name: string } | null;
+        return {
+          id: `${item.id}-expected`,
+          date: item.expected_at!,
+          kind: "milestone_upcoming" as const,
+          title: item.title,
+          subtitle: phase?.name,
+        };
+      }),
+  ];
 
   const nameById = new Map(
     (profiles ?? []).map((p) => [p.id, p.full_name || p.email || "Someone"]),
@@ -73,8 +121,30 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         </p>
       </div>
 
+      {projectEmailAddress ? (
+        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2">
+          <span className="text-xs text-muted-foreground">Forward emails here to log them on this timeline:</span>
+          <code className="text-xs font-medium text-foreground">{projectEmailAddress}</code>
+          <CopyEmailButton email={projectEmailAddress} />
+        </div>
+      ) : (
+        <p className="mt-4 text-xs text-muted-foreground">
+          <Link href="/settings/inbox" className="underline underline-offset-4 hover:text-foreground">
+            Connect a project-timeline inbox
+          </Link>{" "}
+          to get an email address for this project.
+        </p>
+      )}
+
       <div className="mt-8 grid gap-8 lg:grid-cols-[2fr_1fr]">
         <div className="space-y-8">
+          <section>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Timeline</h2>
+            <div className="mt-3 rounded-md border border-border p-4">
+              <ProjectTimeline events={timelineEvents} />
+            </div>
+          </section>
+
           <section>
             <div className="flex items-center justify-between gap-2">
               <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
