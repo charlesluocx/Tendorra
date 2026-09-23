@@ -10,7 +10,7 @@ project, with an automatic flag when a project's gone quiet too long.
 - **Next.js** (App Router) + TypeScript + Tailwind CSS + shadcn/ui
 - **Supabase** (Postgres, Auth, Storage) — schema in `supabase/migrations/`
 - **Microsoft Graph** for connecting a staff member's own Outlook inbox
-- **Anthropic Claude** for turning a tagged email into a structured activity-log entry
+- **Cloudflare Workers AI** for turning a tagged email into a structured activity-log entry
 
 ## Development
 
@@ -52,10 +52,12 @@ See `.env.example` for the full list and where to get each value. In short:
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — from a Google Cloud OAuth
   client (Gmail API enabled). Required for the shared project-timeline
   inbox — see "Project timeline" below.
-- `ANTHROPIC_API_KEY` — required for AI parsing of tagged/synced emails.
+- `CLOUDFLARE_ACCOUNT_ID` / `CLOUDFLARE_API_TOKEN` — required for AI parsing
+  of tagged/synced emails, via Cloudflare Workers AI (free daily allocation,
+  no card required — see `.env.example`).
 
 The app runs and lets you use call notes, manual updates, action items, and
-the checklist without any of the Microsoft/Google/Anthropic keys — those are
+the checklist without any of the Microsoft/Google/Cloudflare keys — those are
 only needed for the email flows.
 
 ## Deployment
