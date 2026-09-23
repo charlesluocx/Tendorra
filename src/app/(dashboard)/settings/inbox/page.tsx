@@ -3,7 +3,8 @@ import { getCurrentMembership } from "@/lib/company";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { disconnectInbox, disconnectGmailInbox } from "./actions";
+import { disconnectInbox, disconnectGmailInbox, syncGmailNow, syncOutlookNow } from "./actions";
+import { SyncNowButton } from "@/components/project/sync-now-button";
 
 export default async function InboxSettingsPage({
   searchParams,
@@ -58,11 +59,14 @@ export default async function InboxSettingsPage({
           </div>
           {gmailConnected ? (
             canManageGmail && (
-              <form action={disconnectGmailInbox}>
-                <Button type="submit" variant="outline" size="sm">
-                  Disconnect
-                </Button>
-              </form>
+              <div className="flex items-start gap-2">
+                <SyncNowButton action={syncGmailNow} />
+                <form action={disconnectGmailInbox}>
+                  <Button type="submit" variant="outline" size="sm">
+                    Disconnect
+                  </Button>
+                </form>
+              </div>
             )
           ) : (
             canManageGmail && (
@@ -97,12 +101,15 @@ export default async function InboxSettingsPage({
             </p>
           </div>
           {myConnection ? (
-            <form action={disconnectInbox}>
-              <input type="hidden" name="id" value={myConnection.id} />
-              <Button type="submit" variant="outline" size="sm">
-                Disconnect
-              </Button>
-            </form>
+            <div className="flex items-start gap-2">
+              <SyncNowButton action={syncOutlookNow} />
+              <form action={disconnectInbox}>
+                <input type="hidden" name="id" value={myConnection.id} />
+                <Button type="submit" variant="outline" size="sm">
+                  Disconnect
+                </Button>
+              </form>
+            </div>
           ) : (
             <Button asChild size="sm">
               <a href="/api/auth/microsoft/start">Connect Outlook</a>

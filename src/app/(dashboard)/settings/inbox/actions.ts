@@ -4,6 +4,67 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentCompanyId, getCurrentMembership } from "@/lib/company";
+import { runGmailSync } from "@/lib/sync/gmail-sync";
+import { runOutlookCategorySync } from "@/lib/sync/outlook-category-sync";
+
+export type SyncState = { error: string | null; result: string | null };
+
+// Runs the same sync a scheduled cron job would, scoped to just the caller's
+// own company/connection — lets "Sync now" work in local dev, where nothing
+// calls the GitHub Actions-scheduled cron routes.
+export async function syncGmailNow(_prevState: SyncState): Promise<SyncState> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "You must be signed in.", result: null };
+
+  const membership = await getCurrentMembership(supabase, user.id);
+  if (!membership || !["owner", "admin"].includes(membership.role)) {
+    return { error: "Only an owner or admin can trigger a sync.", result: null };
+  }
+
+  const companyId = await getCurrentCompanyId(supabase);
+  try {
+    const { messagesProcessed } = await runGmailSync(companyId);
+    revalidatePath("/settings/inbox");
+    return {
+      error: null,
+      result: messagesProcessed === 0 ? "No new emails found." : `Synced ${messagesProcessed} new email${messagesProcessed === 1 ? "" : "s"}.`,
+    };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Sync failed.", result: null };
+  }
+}
+
+export async function syncOutlookNow(_prevState: SyncState): Promise<SyncState> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "You must be signed in.", result: null };
+
+  const admin = createAdminClient();
+  const { data: connection } = await admin
+    .from("connected_inboxes")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("provider", "microsoft")
+    .eq("status", "connected")
+    .maybeSingle();
+  if (!connection) return { error: "Connect your Outlook inbox first.", result: null };
+
+  try {
+    const { messagesProcessed } = await runOutlookCategorySync(connection.id);
+    revalidatePath("/settings/inbox");
+    return {
+      error: null,
+      result: messagesProcessed === 0 ? "No newly categorized emails found." : `Synced ${messagesProcessed} new email${messagesProcessed === 1 ? "" : "s"}.`,
+    };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Sync failed.", result: null };
+  }
+}
 
 export async function disconnectGmailInbox() {
   const supabase = await createClient();
