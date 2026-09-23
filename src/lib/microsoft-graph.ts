@@ -66,6 +66,7 @@ export async function getGraphMe(accessToken: string): Promise<{ mail: string | 
 
 export type GraphMessage = {
   id: string;
+  internetMessageId: string;
   subject: string | null;
   from: { emailAddress: { address: string; name: string } } | null;
   receivedDateTime: string;
@@ -103,7 +104,7 @@ export async function getValidAccessToken(connection: {
 }
 
 export async function listRecentMessages(accessToken: string, top = 25): Promise<GraphMessage[]> {
-  const url = `${GRAPH_BASE}/me/messages?$top=${top}&$orderby=receivedDateTime desc&$select=id,subject,from,receivedDateTime,bodyPreview`;
+  const url = `${GRAPH_BASE}/me/messages?$top=${top}&$orderby=receivedDateTime desc&$select=id,internetMessageId,subject,from,receivedDateTime,bodyPreview`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
   if (!res.ok) throw new Error(`Microsoft Graph list messages failed: ${await res.text()}`);
   const data = await res.json();
@@ -116,4 +117,39 @@ export async function getMessageBody(accessToken: string, messageId: string): Pr
   if (!res.ok) throw new Error(`Microsoft Graph get message failed: ${await res.text()}`);
   const data = await res.json();
   return data.body?.content ?? "";
+}
+
+export type GraphMessageStub = {
+  id: string;
+  internetMessageId: string;
+  subject: string | null;
+  from: { emailAddress: { address: string; name: string } } | null;
+  receivedDateTime: string;
+};
+
+// Category filters use the `any()` lambda operator on a multi-value
+// property, which Graph only supports as an "advanced query" — hence the
+// ConsistencyLevel header and $count param below, even though we don't use
+// the count itself. Never fetches messages outside this exact category, so
+// nothing untagged is read at all — the point of tagging by category
+// instead of syncing a whole inbox.
+export async function listMessagesByCategory(
+  accessToken: string,
+  category: string,
+  top = 50,
+): Promise<GraphMessageStub[]> {
+  const escaped = category.replace(/'/g, "''");
+  const url = new URL(`${GRAPH_BASE}/me/messages`);
+  url.searchParams.set("$filter", `categories/any(c:c eq '${escaped}')`);
+  url.searchParams.set("$select", "id,internetMessageId,subject,from,receivedDateTime");
+  url.searchParams.set("$orderby", "receivedDateTime desc");
+  url.searchParams.set("$top", String(top));
+  url.searchParams.set("$count", "true");
+
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}`, ConsistencyLevel: "eventual" },
+  });
+  if (!res.ok) throw new Error(`Microsoft Graph list messages by category failed: ${await res.text()}`);
+  const data = await res.json();
+  return data.value ?? [];
 }

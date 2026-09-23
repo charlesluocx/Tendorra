@@ -1,0 +1,21 @@
+name: Sync project-timeline Outlook categories
+
+on:
+  schedule:
+    # Every 10 minutes, same cadence as sync-gmail — the route dedupes by
+    # internetMessageId either way, so running more often is harmless.
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call the sync-outlook-categories endpoint
+        run: |
+          if [ -z "${{ vars.APP_URL }}" ] || [ -z "${{ secrets.CRON_SECRET }}" ]; then
+            echo "APP_URL repo variable or CRON_SECRET repo secret not set — skipping." >&2
+            exit 1
+          fi
+          curl --fail-with-body -sS -X POST "${{ vars.APP_URL }}/api/cron/sync-outlook-categories" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"

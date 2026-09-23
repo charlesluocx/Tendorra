@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
-export function CopyEmailButton({ email }: { email: string }) {
+export function CopyEmailButton({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
 
   return (
@@ -13,7 +13,7 @@ export function CopyEmailButton({ email }: { email: string }) {
       size="sm"
       onClick={async () => {
         try {
-          await navigator.clipboard.writeText(email);
+          await navigator.clipboard.writeText(value);
           setCopied(true);
           setTimeout(() => setCopied(false), 2000);
         } catch {

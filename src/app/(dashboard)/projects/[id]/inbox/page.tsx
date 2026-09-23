@@ -81,6 +81,7 @@ export default async function ProjectInboxPage({ params }: { params: Promise<{ i
               projectId={id}
               connectionId={statusRow.id}
               messageId={message.id}
+              internetMessageId={message.internetMessageId}
               subject={message.subject ?? ""}
               fromAddress={message.from?.emailAddress?.address ?? ""}
               receivedAt={message.receivedDateTime}

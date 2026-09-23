@@ -171,8 +171,11 @@ not tenant-owned data, so they were left without a `company_id`.
 - `connected_inboxes` — one row per staff member's connected Outlook
   account. Access/refresh tokens are readable only by the service role
   (column-level `GRANT`); the client only ever sees connection status.
-- `tagged_emails` — an email a staff member tagged to a project; drives the
-  AI-parsing pipeline into `activity_log`.
+- `tagged_emails` — an email a staff member manually tagged to a project;
+  drives the AI-parsing pipeline into `activity_log`. `internet_message_id`
+  (the email's RFC 5322 Message-ID, shared by every recipient's copy) has a
+  unique index per project so a colleague cc'd on the same email tagging
+  their own copy doesn't record it twice.
 - `project_activity_status` — a view computing `is_stale` per project from
   `companies.stale_after_days` (defaults to 7), used for the "gone quiet"
   flag on the dashboard and for the stale-project reminder emails (see
@@ -192,32 +195,53 @@ not tenant-owned data, so they were left without a `company_id`.
   in, deduped by `gmail_message_id`, with `parse_status` (`parsed` /
   `failed` / `unmatched` if no project's `email_code` was found in the
   message).
+- `project_outlook_events` — a processing log of Outlook messages pulled in
+  by the category-based sync (see "Project timeline" below), deduped by
+  `internet_message_id` per `(company_id, project_id)` so a colleague cc'd
+  on the same email and tagging it with the same category in their own
+  inbox doesn't record it twice; `parse_status` is `pending` / `parsed` /
+  `failed`.
 
 ## Project timeline
 
-Every project gets a unique, auto-generated `email_code` (`projects` table)
-used as a Gmail "+" tag, so staff can build a project's timeline just by
-forwarding or CCing an email — no per-person inbox connection, no manual
-tagging.
+Every project gets a unique, auto-generated `email_code` (`projects` table),
+reused as both a Gmail "+" tag and an Outlook category name — three ways to
+get an email onto a project's timeline, in increasing order of automation:
 
-- **`/settings/inbox`** — an owner/admin connects **one shared Gmail inbox**
-  for the whole company (Google OAuth, `src/lib/gmail.ts` +
-  `src/app/api/auth/gmail/start`+`callback`). This is separate from, and in
-  addition to, the existing per-staff Outlook connection on the same page.
-- Each project's page shows its forwarding address (e.g.
-  `company-timeline+A1B2C3@gmail.com`) with a copy button. Staff forward or
-  CC relevant emails there.
-- `POST /api/cron/sync-gmail` (same protected-by-`CRON_SECRET` pattern as
-  `/api/cron/stale-reminders`, called every 10 minutes by
-  `.github/workflows/sync-gmail.yml`) polls the shared inbox, matches each
-  new message's `+code` against a project, and runs matched emails through
-  the same AI parsing pipeline as tagged Outlook emails, straight into
-  `activity_log`.
-- The **Timeline** section on each project page (`src/components/project/
-  timeline.tsx`) plots that project's `activity_log` entries alongside its
-  checklist milestones (both reached — `completed_at` — and upcoming —
-  `expected_at`) as one chronological visual timeline, separate from the
-  more detailed Activity Feed list below it.
+1. **Manually tag one email** — connect your own Outlook at
+   `/settings/inbox`, then use **"Tag an email →"** on a project page to
+   pick one of your recent messages. Immediate, per-email, no setup beyond
+   connecting.
+2. **Forward/CC the project's Gmail address** — an owner/admin connects one
+   shared Gmail inbox for the whole company (Google OAuth,
+   `src/lib/gmail.ts` + `src/app/api/auth/gmail/start`+`callback`, separate
+   from the per-staff Outlook connection above). Each project's page shows
+   its address (e.g. `company-timeline+A1B2C3@gmail.com`) with a copy
+   button; `POST /api/cron/sync-gmail` (every 10 minutes via
+   `.github/workflows/sync-gmail.yml`) matches the `+code` and parses it in.
+3. **Tag by Outlook category, automatically** — each project's page also
+   shows its `email_code` as an Outlook category name to copy. Any staff
+   member with their own Outlook connected (from option 1) can apply that
+   category to emails as they read them, with zero further action: `POST
+   /api/cron/sync-outlook-categories` (every 10 minutes via
+   `.github/workflows/sync-outlook-categories.yml`) calls
+   `listMessagesByCategory` (`src/lib/microsoft-graph.ts`), which filters
+   by category **server-side via Microsoft Graph** — mail without that
+   category is never fetched, so this reads nothing beyond what was
+   deliberately tagged.
+
+Options 1 and 3 both dedupe by the email's RFC 5322 Message-ID
+(`internetMessageId`), not Graph's per-mailbox message id — the id every
+recipient's copy shares — so when several staff are cc'd on one email and
+each tags/categorizes their own copy, it's still recorded on the timeline
+exactly once (`tagged_emails.internet_message_id`,
+`project_outlook_events.internet_message_id`).
+
+The **Timeline** section on each project page (`src/components/project/
+timeline.tsx`) plots that project's `activity_log` entries alongside its
+checklist milestones (both reached — `completed_at` — and upcoming —
+`expected_at`) as one chronological visual timeline, separate from the
+more detailed Activity Feed list below it.
 
 ## Reminders
 

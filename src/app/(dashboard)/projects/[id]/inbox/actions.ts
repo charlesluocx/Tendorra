@@ -7,13 +7,14 @@ import { getCurrentCompanyId } from "@/lib/company";
 import { getValidAccessToken, getMessageBody } from "@/lib/microsoft-graph";
 import { parseEmailWithAI } from "@/lib/ai/parse-email";
 
-export type TagEmailState = { error: string | null };
-const emptyState: TagEmailState = { error: null };
+export type TagEmailState = { error: string | null; notice: string | null };
+const emptyState: TagEmailState = { error: null, notice: null };
 
 export async function tagEmail(_prevState: TagEmailState, formData: FormData): Promise<TagEmailState> {
   const projectId = String(formData.get("project_id") ?? "");
   const connectionId = String(formData.get("connection_id") ?? "");
   const messageId = String(formData.get("message_id") ?? "");
+  const internetMessageId = String(formData.get("internet_message_id") ?? "");
   const subject = String(formData.get("subject") ?? "");
   const fromAddress = String(formData.get("from_address") ?? "");
   const receivedAt = String(formData.get("received_at") ?? "");
@@ -23,9 +24,28 @@ export async function tagEmail(_prevState: TagEmailState, formData: FormData): P
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: "You must be signed in." };
+  if (!user) return { error: "You must be signed in.", notice: null };
 
   const companyId = await getCurrentCompanyId(supabase);
+
+  // A colleague cc'd on the same email sees their own copy with a different
+  // ms_message_id, but every recipient's copy shares one Message-ID
+  // (internetMessageId). Checking that first stops the same email being
+  // recorded twice on the timeline.
+  if (internetMessageId) {
+    const { data: existing } = await supabase
+      .from("tagged_emails")
+      .select("id")
+      .eq("project_id", projectId)
+      .eq("internet_message_id", internetMessageId)
+      .maybeSingle();
+    if (existing) {
+      return {
+        error: null,
+        notice: "Already tagged to this project (likely by a colleague who was cc'd) — not recorded twice.",
+      };
+    }
+  }
 
   const { data: tagged, error } = await supabase
     .from("tagged_emails")
@@ -34,6 +54,7 @@ export async function tagEmail(_prevState: TagEmailState, formData: FormData): P
       project_id: projectId,
       connection_id: connectionId,
       ms_message_id: messageId,
+      internet_message_id: internetMessageId || null,
       subject: subject || null,
       from_address: fromAddress || null,
       received_at: receivedAt || null,
@@ -44,7 +65,15 @@ export async function tagEmail(_prevState: TagEmailState, formData: FormData): P
     .single();
 
   if (error || !tagged) {
-    return { error: error?.message ?? "Could not tag that email." };
+    // A unique-constraint hit here means two requests raced past the check
+    // above for the same email — same outcome as catching it up front.
+    if (error?.code === "23505") {
+      return {
+        error: null,
+        notice: "Already tagged to this project (likely by a colleague who was cc'd) — not recorded twice.",
+      };
+    }
+    return { error: error?.message ?? "Could not tag that email.", notice: null };
   }
 
   revalidatePath(`/projects/${projectId}`);
@@ -57,7 +86,10 @@ export async function tagEmail(_prevState: TagEmailState, formData: FormData): P
   } catch (err) {
     const admin = createAdminClient();
     await admin.from("tagged_emails").update({ parse_status: "failed" }).eq("id", tagged.id);
-    return { error: err instanceof Error ? `Tagged, but parsing failed: ${err.message}` : "Tagged, but parsing failed." };
+    return {
+      error: err instanceof Error ? `Tagged, but parsing failed: ${err.message}` : "Tagged, but parsing failed.",
+      notice: null,
+    };
   }
 
   revalidatePath(`/projects/${projectId}`);

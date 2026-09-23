@@ -121,20 +121,30 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         </p>
       </div>
 
-      {projectEmailAddress ? (
-        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2">
-          <span className="text-xs text-muted-foreground">Forward emails here to log them on this timeline:</span>
-          <code className="text-xs font-medium text-foreground">{projectEmailAddress}</code>
-          <CopyEmailButton email={projectEmailAddress} />
+      <div className="mt-4 space-y-2">
+        {projectEmailAddress ? (
+          <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2">
+            <span className="text-xs text-muted-foreground">Forward emails here to log them on this timeline:</span>
+            <code className="text-xs font-medium text-foreground">{projectEmailAddress}</code>
+            <CopyEmailButton value={projectEmailAddress} />
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            <Link href="/settings/inbox" className="underline underline-offset-4 hover:text-foreground">
+              Connect a project-timeline inbox
+            </Link>{" "}
+            to get an email address for this project.
+          </p>
+        )}
+
+        <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2">
+          <span className="text-xs text-muted-foreground">
+            Or, in your own Outlook, tag emails with this category to log them here automatically:
+          </span>
+          <code className="text-xs font-medium text-foreground">{project.email_code}</code>
+          <CopyEmailButton value={project.email_code} />
         </div>
-      ) : (
-        <p className="mt-4 text-xs text-muted-foreground">
-          <Link href="/settings/inbox" className="underline underline-offset-4 hover:text-foreground">
-            Connect a project-timeline inbox
-          </Link>{" "}
-          to get an email address for this project.
-        </p>
-      )}
+      </div>
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[2fr_1fr]">
         <div className="space-y-8">

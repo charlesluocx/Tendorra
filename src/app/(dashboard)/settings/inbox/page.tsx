@@ -112,10 +112,14 @@ export default async function InboxSettingsPage({
 
         <Alert className="mt-4 border-border bg-muted/40">
           <AlertDescription className="text-muted-foreground">
-            Read-only access: we can only view your mail, never send, delete, or edit it. You
-            browse your own recent messages to pick one, and only the emails <em>you</em> choose
-            to tag to a project are stored or sent to AI for summarizing — everything else stays
-            in your inbox, untouched. Disconnect at any time.
+            Read-only access: we can only view your mail, never send, delete, or edit it. Two ways
+            to log an email — tag one manually from your recent messages below, or in Outlook
+            apply a project&apos;s category (shown on that project&apos;s page) to any email and
+            it&apos;s picked up automatically every few minutes. Either way, only the category we
+            were told to look for — or an email you personally tag — is ever read or sent to AI
+            for summarizing; everything else in your inbox stays untouched and unread. If a
+            colleague is cc&apos;d on the same email, it&apos;s only recorded once. Disconnect at
+            any time.
           </AlertDescription>
         </Alert>
       </div>

@@ -888,6 +888,90 @@ export type Database = {
           },
         ]
       }
+      project_outlook_events: {
+        Row: {
+          activity_id: string | null
+          company_id: string
+          connection_id: string | null
+          created_at: string
+          from_address: string | null
+          id: string
+          internet_message_id: string
+          ms_message_id: string
+          parse_status: string
+          parsed_at: string | null
+          project_id: string
+          received_at: string | null
+          subject: string | null
+        }
+        Insert: {
+          activity_id?: string | null
+          company_id: string
+          connection_id?: string | null
+          created_at?: string
+          from_address?: string | null
+          id?: string
+          internet_message_id: string
+          ms_message_id: string
+          parse_status?: string
+          parsed_at?: string | null
+          project_id: string
+          received_at?: string | null
+          subject?: string | null
+        }
+        Update: {
+          activity_id?: string | null
+          company_id?: string
+          connection_id?: string | null
+          created_at?: string
+          from_address?: string | null
+          id?: string
+          internet_message_id?: string
+          ms_message_id?: string
+          parse_status?: string
+          parsed_at?: string | null
+          project_id?: string
+          received_at?: string | null
+          subject?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_outlook_events_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "activity_log"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_outlook_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_outlook_events_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "connected_inboxes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_outlook_events_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_activity_status"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "project_outlook_events_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_phases: {
         Row: {
           company_id: string
@@ -1144,6 +1228,7 @@ export type Database = {
           connection_id: string | null
           from_address: string | null
           id: string
+          internet_message_id: string | null
           ms_message_id: string
           parse_status: string
           parsed_at: string | null
@@ -1160,6 +1245,7 @@ export type Database = {
           connection_id?: string | null
           from_address?: string | null
           id?: string
+          internet_message_id?: string | null
           ms_message_id: string
           parse_status?: string
           parsed_at?: string | null
@@ -1176,6 +1262,7 @@ export type Database = {
           connection_id?: string | null
           from_address?: string | null
           id?: string
+          internet_message_id?: string | null
           ms_message_id?: string
           parse_status?: string
           parsed_at?: string | null
