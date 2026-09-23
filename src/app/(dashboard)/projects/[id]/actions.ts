@@ -2,10 +2,67 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentCompanyId } from "@/lib/company";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getCurrentCompanyId, getCurrentMembership } from "@/lib/company";
+import { runGmailSync } from "@/lib/sync/gmail-sync";
+import { runOutlookCategorySync } from "@/lib/sync/outlook-category-sync";
+import type { SyncState } from "@/app/(dashboard)/settings/inbox/actions";
 
 export type FormState = { error: string | null };
 const emptyState: FormState = { error: null };
+
+// Runs whichever email sync(s) the caller can trigger — the company's
+// shared Gmail inbox (owner/admin only) and/or their own connected Outlook
+// (category sync) — scoped so this works from a project page without a
+// trip to /settings/inbox.
+export async function syncProjectEmailsNow(_prevState: SyncState, formData: FormData): Promise<SyncState> {
+  const projectId = String(formData.get("project_id") ?? "");
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "You must be signed in.", result: null };
+
+  const companyId = await getCurrentCompanyId(supabase);
+  const membership = await getCurrentMembership(supabase, user.id);
+  const admin = createAdminClient();
+
+  try {
+    let messagesProcessed = 0;
+
+    if (membership && ["owner", "admin"].includes(membership.role)) {
+      const { data: gmailInbox } = await admin
+        .from("company_gmail_inbox")
+        .select("id")
+        .eq("company_id", companyId)
+        .eq("status", "connected")
+        .maybeSingle();
+      if (gmailInbox) {
+        messagesProcessed += (await runGmailSync(companyId)).messagesProcessed;
+      }
+    }
+
+    const { data: connection } = await admin
+      .from("connected_inboxes")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("provider", "microsoft")
+      .eq("status", "connected")
+      .maybeSingle();
+    if (connection) {
+      messagesProcessed += (await runOutlookCategorySync(connection.id)).messagesProcessed;
+    }
+
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      error: null,
+      result: messagesProcessed === 0 ? "No new emails found." : `Synced ${messagesProcessed} new email${messagesProcessed === 1 ? "" : "s"}.`,
+    };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Sync failed.", result: null };
+  }
+}
 
 export async function addCallNote(
   _prevState: FormState,

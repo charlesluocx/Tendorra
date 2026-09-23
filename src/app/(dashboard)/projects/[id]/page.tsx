@@ -9,7 +9,8 @@ import { ActionItemForm } from "@/components/project/action-item-form";
 import { StatusSelect } from "@/components/project/status-select";
 import { ProjectTimeline, type TimelineEvent } from "@/components/project/timeline";
 import { CopyEmailButton } from "@/components/project/copy-email-button";
-import { setActionItemStatus, setChecklistItemStatus } from "./actions";
+import { SyncNowButton } from "@/components/project/sync-now-button";
+import { setActionItemStatus, setChecklistItemStatus, syncProjectEmailsNow } from "./actions";
 
 const SOURCE_LABEL: Record<string, string> = {
   email: "Email",
@@ -160,12 +161,15 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                 Activity Feed
               </h2>
-              <Link
-                href={`/projects/${id}/inbox`}
-                className="text-xs font-medium text-foreground underline-offset-4 hover:underline"
-              >
-                Tag an email →
-              </Link>
+              <div className="flex items-center gap-3">
+                <SyncNowButton action={syncProjectEmailsNow} hiddenFields={{ project_id: id }} />
+                <Link
+                  href={`/projects/${id}/inbox`}
+                  className="text-xs font-medium text-foreground underline-offset-4 hover:underline"
+                >
+                  Tag an email →
+                </Link>
+              </div>
             </div>
             <div className="mt-3 space-y-3">
               <ManualUpdateForm projectId={id} />
