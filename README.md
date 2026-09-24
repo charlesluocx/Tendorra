@@ -1,16 +1,17 @@
 # Tendorra
 
 Live project-activity tracking for property and construction teams, built on
-top of the existing consultant/RFQ tender workflow: tagged emails, quick call
-notes, and owner-assigned action items all land in one shared feed per
-project, with an automatic flag when a project's gone quiet too long.
+top of the existing consultant/RFQ tender workflow: emails dragged onto a
+project, quick call notes, and owner-assigned action items all land in one
+shared feed per project, with an automatic flag when a project's gone quiet
+too long.
 
 ## Stack
 
 - **Next.js** (App Router) + TypeScript + Tailwind CSS + shadcn/ui
 - **Supabase** (Postgres, Auth, Storage) — schema in `supabase/migrations/`
-- **Microsoft Graph** for connecting a staff member's own Outlook inbox
-- **Anthropic Claude** for turning a tagged email into a structured activity-log entry
+- **mailparser** / **@kenjiuno/msgreader** for reading dragged-in `.eml`/`.msg` email files
+- **Cloudflare Workers AI** for turning a logged email into a structured activity-log entry
 
 ## Development
 
@@ -45,15 +46,17 @@ See `.env.example` for the full list and where to get each value. In short:
 - `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` — already
   filled in `.env.example`; safe to expose to the browser.
 - `SUPABASE_SERVICE_ROLE_KEY` — from the Supabase dashboard. Server-only,
-  bypasses RLS; used for writing OAuth tokens and other trusted operations.
-- `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` / `MICROSOFT_TENANT_ID` —
-  from an Entra ID (Azure AD) app registration. Required for the "Connect
-  Outlook" flow under Inbox Settings.
-- `ANTHROPIC_API_KEY` — required for AI parsing of tagged emails.
+  bypasses RLS; used for the one write (`ai_usage_log`) that needs it.
+- `CLOUDFLARE_ACCOUNT_ID` / `CLOUDFLARE_API_TOKEN` — required for AI parsing
+  of an uploaded email, via Cloudflare Workers AI (free daily allocation,
+  no card required — see `.env.example`).
 
 The app runs and lets you use call notes, manual updates, action items, and
-the checklist without any of the Microsoft/Anthropic keys — those are only
-needed for the email-tagging flow.
+the checklist without the Cloudflare keys. You can still drag an email in
+without them — it's recorded (so dedup still works, and you won't get a
+duplicate once the key is added), but nothing shows up on the visible
+Timeline/Activity Feed until the Cloudflare keys are set, since that entry
+only gets created once AI parsing succeeds.
 
 ## Deployment
 
@@ -122,7 +125,7 @@ not tenant-owned data, so they were left without a `company_id`.
   created together in `src/app/signup/actions.ts` via the service-role
   client (an owner can't satisfy the company-membership RLS check before
   their own membership row exists, so this one write path is trusted server
-  code, same pattern as the OAuth token writes).
+  code, same pattern as other service-role-only writes like `ai_usage_log`).
 - Owner signup takes an optional **company website**. If given,
   `src/lib/branding/extract.ts` best-effort fetches it and pulls a logo
   (favicon/apple-touch-icon/`og:image` from the HTML, falling back to
@@ -139,13 +142,19 @@ not tenant-owned data, so they were left without a `company_id`.
   re-colors per company with no component changes.
 - **`/settings/team`** — owners/admins invite by email (`company_invites`,
   one row per pending invite, unique per company+email while pending) and
-  can change existing members' roles. There's no email provider configured,
-  so an invite produces a shareable `/invite/<token>` link shown directly in
-  the UI (the same "copy this link" pattern the existing consultant-invite
-  flow already used) rather than an email being sent.
+  can change existing members' roles. If `RESEND_API_KEY` is set (see
+  `.env.example`), the invite is also emailed via
+  `src/lib/email/send-invite.ts`; either way, the `/invite/<token>` link is
+  always shown directly in the UI too, so there's always a fallback to copy
+  and send manually if email sending isn't configured or fails.
 - **`/invite/[token]`** — public page; the invitee sets a name and password,
   which creates their account and inserts their `company_users` row with
   the role the invite specified, scoped to that one company only.
+- **`/settings/company`** — owners/admins can edit the company name, website
+  (re-running the branding extraction above on change), and the "gone
+  quiet" threshold (`stale_after_days`, used by both the dashboard badge and
+  the reminder emails — see "Reminders" below). There was previously no way
+  to change `stale_after_days` short of editing the row directly.
 
 ### Key tables
 
@@ -159,29 +168,90 @@ not tenant-owned data, so they were left without a `company_id`.
 - `project_checklist_items` — per-project instance of that template,
   seeded automatically when a project is created; tracks `expected_at`
   (planned) separately from `completed_at` (actual).
-- `connected_inboxes` — one row per staff member's connected Outlook
-  account. Access/refresh tokens are readable only by the service role
-  (column-level `GRANT`); the client only ever sees connection status.
-- `tagged_emails` — an email a staff member tagged to a project; drives the
-  AI-parsing pipeline into `activity_log`.
+- `project_email_uploads` — a log of every email dragged onto a project,
+  driving the AI-parsing pipeline into `activity_log`. `internet_message_id`
+  (the email's RFC 5322 Message-ID, shared by every recipient's copy) has a
+  unique index per project so a colleague cc'd on the same email dragging in
+  their own copy doesn't record it twice.
 - `project_activity_status` — a view computing `is_stale` per project from
   `companies.stale_after_days` (defaults to 7), used for the "gone quiet"
-  flag on the dashboard.
+  flag on the dashboard and for the stale-project reminder emails (see
+  "Reminders" below). `projects.last_reminder_sent_at` tracks the last time
+  each project's owners/admins were emailed about it, so the job below
+  doesn't re-send every run.
 - `ai_usage_log` — one row per AI call (currently just email parsing), with
   `model`, `input_tokens`, `output_tokens`, and a generated `total_tokens`,
   scoped to the company that triggered it. This is internal cost visibility
   only for now — there's no cap or per-company billing wired to it yet (see
-  "What's not built yet"). Company members can query their own company's
-  rows directly; there's no dashboard UI for it yet.
+  "What's not built yet"). Viewable at **`/settings/usage`** (any company
+  member; shows this month's token total and the last 100 AI calls).
+
+## Project timeline
+
+Every project's page has a drag-and-drop zone
+(`src/components/project/email-dropzone.tsx`): drop an email file onto it
+and it's read, AI-summarized, and logged straight to that project — no
+inbox connection, no OAuth, no scheduled sync job.
+
+- **Drag straight from Outlook desktop** — in Chrome/Edge on Windows,
+  dragging an email out of the classic Outlook app produces a virtual
+  `.msg` file the browser can read directly, no save step needed.
+- **Or drop a saved file** — Gmail's "Show original" → download, or
+  Outlook's "Save As" both produce a `.eml` file that works the same way.
+- Parsing (`src/lib/email-file-parser.ts`) sniffs the file's content (the
+  OLE/CFBF magic bytes for `.msg`, otherwise plain MIME) rather than
+  trusting the extension, since a dragged virtual file's name isn't always
+  reliable: `.msg` goes through `@kenjiuno/msgreader`, `.eml` through
+  `mailparser`.
+- The upload is scoped to whichever project's page it landed on — no
+  project code to match, since the drop target already says which project.
+- Dedupes by the email's RFC 5322 Message-ID (`internetMessageId`/
+  `messageId`, shared by every recipient's copy), not any per-mailbox id —
+  so if several staff are cc'd on one email and each drags in their own
+  copy, it's recorded on the timeline exactly once
+  (`project_email_uploads.internet_message_id`).
+- The server action (`uploadEmailFile` in `src/app/(dashboard)/projects/
+  [id]/actions.ts`) runs the AI parsing (Cloudflare Workers AI) inline and
+  writes straight to `activity_log` — no processing queue, no polling.
+- Not yet verified running on the actual Cloudflare Workers runtime (only
+  local `next dev` so far) — `mailparser` pulls in a few Node built-ins
+  that OpenNext's Cloudflare adapter usually polyfills, but this hasn't
+  been confirmed end-to-end post-deploy.
+
+The **Timeline** section on each project page (`src/components/project/
+timeline.tsx`) plots that project's `activity_log` entries alongside its
+checklist milestones (both reached — `completed_at` — and upcoming —
+`expected_at`) as one chronological visual timeline, separate from the
+more detailed Activity Feed list below it.
+
+## Reminders
+
+`POST /api/cron/stale-reminders` finds every project currently flagged
+`is_stale` (via `project_activity_status`) that hasn't had a reminder sent
+in the last 24 hours, and emails each affected company's owners/admins a
+summary via Resend (`src/lib/email/send-stale-reminder.ts`) — a proactive
+nudge on top of the dashboard's "Gone quiet" badge, not a replacement for
+it; if `RESEND_API_KEY` isn't set, the route still runs (and still updates
+`last_reminder_sent_at`) but just doesn't send anything.
+
+The route is protected by a shared secret (`CRON_SECRET`) since it acts
+across every company with the service-role client — anyone calling it
+without the right `Authorization: Bearer <CRON_SECRET>` header gets a 401.
+`.github/workflows/stale-reminders.yml` calls it hourly; it needs an
+**`APP_URL` repo variable** (your deployed app's URL, used both to call the
+route and to build the links inside the reminder emails) and a
+**`CRON_SECRET` repo secret** (any random string, e.g. from
+`openssl rand -hex 32` — set the same value in your Worker's env via
+`wrangler secret put CRON_SECRET`). Without either, the workflow run fails
+fast with a clear message instead of silently no-op'ing.
 
 ## What's not built yet
 
 This covers Phase 1 of the module (activity feed, call notes, action items,
-checklist, email tagging + AI parsing, the stale-project flag) on top of the
-existing consultant/RFQ tender flow. Not in this pass:
+checklist, email tagging + AI parsing, the stale-project flag and its
+reminder emails) on top of the existing consultant/RFQ tender flow. Not in
+this pass:
 
-- A push/email/Slack **reminders engine** — today the "gone quiet" flag is
-  surfaced in the dashboard UI only, not proactively pushed to anyone.
 - The **public tender board** (a separate area where owners can flag a job
   public for consultants to browse) — the existing private
   invite-a-consultant flow is untouched and still works.
@@ -193,7 +263,3 @@ existing consultant/RFQ tender flow. Not in this pass:
   caps per plan are not. `ai_usage_log` (see "Key tables") tracks token
   spend per company today, but nothing acts on it yet — that's the natural
   next step once pricing per external company is decided.
-- **Invite emails** — invites currently produce a link shown in the UI to
-  copy and send manually; wiring up an email provider (e.g. Resend, already
-  referenced elsewhere in this codebase's consultant-invite flow) to send
-  it automatically is a small follow-up.

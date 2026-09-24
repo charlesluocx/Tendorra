@@ -11,9 +11,16 @@ export type ParsedEmail = {
   };
 };
 
-const SYSTEM_PROMPT = `You extract structured project-activity data from a construction/property project email for a busy project manager's activity feed. Read the email and respond with JSON only, no commentary, in exactly this shape:
+const SYSTEM_PROMPT = `You extract structured project-activity data from a construction/property project email for a busy project manager's activity feed. Read the email and respond with JSON only, no commentary, no markdown code fences, in exactly this shape:
 {"summary": "one or two sentence plain-English summary of what happened or was asked", "commitments": ["short phrase per commitment or promise made by either party"], "key_dates": ["short phrase naming any date/deadline mentioned, e.g. 'Site visit Friday 14 March'"]}
 If there are no commitments or dates, return empty arrays for them. Never invent facts not present in the email.`;
+
+// Cloudflare Workers AI instead of a paid provider — a free daily allocation
+// (no card required) comfortably covers this app's per-email parsing volume.
+// Open-weight models are less reliable than Claude at "JSON only, no
+// commentary", so the response is scanned for the first {...} block rather
+// than parsed as-is.
+const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 
 export async function parseEmailWithAI(params: {
   subject: string | null;
@@ -21,8 +28,9 @@ export async function parseEmailWithAI(params: {
   receivedAt: string | null;
   body: string;
 }): Promise<ParsedEmail> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not configured.");
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+  const apiToken = process.env.CLOUDFLARE_API_TOKEN;
+  if (!accountId || !apiToken) throw new Error("CLOUDFLARE_ACCOUNT_ID/CLOUDFLARE_API_TOKEN is not configured.");
 
   const userContent = [
     params.subject ? `Subject: ${params.subject}` : "",
@@ -34,28 +42,30 @@ export async function parseEmailWithAI(params: {
     .filter(Boolean)
     .join("\n");
 
-  const model = "claude-sonnet-5";
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${MODEL}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
+      Authorization: `Bearer ${apiToken}`,
     },
     body: JSON.stringify({
-      model,
-      max_tokens: 1024,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: userContent }],
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: userContent },
+      ],
     }),
   });
 
   if (!res.ok) {
-    throw new Error(`Anthropic API error [${res.status}]: ${await res.text()}`);
+    throw new Error(`Cloudflare Workers AI error [${res.status}]: ${await res.text()}`);
   }
 
   const data = await res.json();
-  const text: string = data.content?.[0]?.text ?? "";
+  if (!data.success) {
+    throw new Error(`Cloudflare Workers AI error: ${JSON.stringify(data.errors)}`);
+  }
+
+  const text: string = data.result?.response ?? "";
   const match = text.match(/\{[\s\S]*\}/);
   if (!match) throw new Error("AI response did not contain JSON.");
 
@@ -65,9 +75,9 @@ export async function parseEmailWithAI(params: {
     commitments: Array.isArray(parsed.commitments) ? parsed.commitments.map(String) : [],
     key_dates: Array.isArray(parsed.key_dates) ? parsed.key_dates.map(String) : [],
     usage: {
-      model,
-      inputTokens: Number(data.usage?.input_tokens ?? 0),
-      outputTokens: Number(data.usage?.output_tokens ?? 0),
+      model: MODEL,
+      inputTokens: Number(data.result?.usage?.prompt_tokens ?? 0),
+      outputTokens: Number(data.result?.usage?.completion_tokens ?? 0),
     },
   };
 }
