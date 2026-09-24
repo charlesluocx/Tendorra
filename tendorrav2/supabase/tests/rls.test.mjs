@@ -10,7 +10,7 @@ const db = new PGlite({ extensions: { pgcrypto } });
 // Minimal stand-ins for Supabase's auth + storage schemas and roles
 await db.exec(`
   create role anon nologin; create role authenticated nologin; create role service_role nologin bypassrls;
-  create schema auth; create schema storage; create schema extensions;
+  create schema auth; create schema storage; create schema extensions; create extension pgcrypto schema extensions;
   create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb default '{}');
   create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.sub', true), '')::uuid $$;
   create table storage.buckets (id text primary key, name text, public boolean, file_size_limit bigint);
@@ -27,6 +27,7 @@ for (const f of fs.readdirSync(M).sort()) {
 // Supabase's default grants
 await db.exec(`
   grant select, insert, update, delete on all tables in schema public to authenticated;
+  grant usage on schema extensions to authenticated;
   revoke update on public.profiles from authenticated; grant update (full_name) on public.profiles to authenticated;
   grant select, insert, delete on storage.objects to authenticated;
 `);
