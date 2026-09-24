@@ -8,9 +8,8 @@ import { ManualUpdateForm } from "@/components/project/manual-update-form";
 import { ActionItemForm } from "@/components/project/action-item-form";
 import { StatusSelect } from "@/components/project/status-select";
 import { ProjectTimeline, type TimelineEvent } from "@/components/project/timeline";
-import { CopyEmailButton } from "@/components/project/copy-email-button";
-import { SyncNowButton } from "@/components/project/sync-now-button";
-import { setActionItemStatus, setChecklistItemStatus, syncProjectEmailsNow } from "./actions";
+import { EmailDropzone } from "@/components/project/email-dropzone";
+import { setActionItemStatus, setChecklistItemStatus, uploadEmailFile } from "./actions";
 
 const SOURCE_LABEL: Record<string, string> = {
   email: "Email",
@@ -26,7 +25,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     await Promise.all([
       supabase
         .from("projects")
-        .select("id, company_id, name, address, postcode, current_phase, email_code")
+        .select("id, company_id, name, address, postcode, current_phase")
         .eq("id", id)
         .maybeSingle(),
       supabase
@@ -51,17 +50,6 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     ]);
 
   if (!project) notFound();
-
-  const { data: gmailInbox } = await supabase
-    .from("company_gmail_inbox")
-    .select("email_address, status")
-    .eq("company_id", project.company_id)
-    .maybeSingle();
-
-  const projectEmailAddress =
-    gmailInbox?.status === "connected"
-      ? gmailInbox.email_address.replace("@", `+${project.email_code}@`)
-      : null;
 
   const timelineEvents: TimelineEvent[] = [
     ...(activity ?? []).map((entry) => ({
@@ -122,29 +110,8 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         </p>
       </div>
 
-      <div className="mt-4 space-y-2">
-        {projectEmailAddress ? (
-          <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2">
-            <span className="text-xs text-muted-foreground">Forward emails here to log them on this timeline:</span>
-            <code className="text-xs font-medium text-foreground">{projectEmailAddress}</code>
-            <CopyEmailButton value={projectEmailAddress} />
-          </div>
-        ) : (
-          <p className="text-xs text-muted-foreground">
-            <Link href="/settings/inbox" className="underline underline-offset-4 hover:text-foreground">
-              Connect a project-timeline inbox
-            </Link>{" "}
-            to get an email address for this project.
-          </p>
-        )}
-
-        <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2">
-          <span className="text-xs text-muted-foreground">
-            Or, in your own Outlook, tag emails with this category to log them here automatically:
-          </span>
-          <code className="text-xs font-medium text-foreground">{project.email_code}</code>
-          <CopyEmailButton value={project.email_code} />
-        </div>
+      <div className="mt-4">
+        <EmailDropzone projectId={id} action={uploadEmailFile} />
       </div>
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[2fr_1fr]">
@@ -157,20 +124,9 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           </section>
 
           <section>
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                Activity Feed
-              </h2>
-              <div className="flex items-center gap-3">
-                <SyncNowButton action={syncProjectEmailsNow} hiddenFields={{ project_id: id }} />
-                <Link
-                  href={`/projects/${id}/inbox`}
-                  className="text-xs font-medium text-foreground underline-offset-4 hover:underline"
-                >
-                  Tag an email →
-                </Link>
-              </div>
-            </div>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Activity Feed
+            </h2>
             <div className="mt-3 space-y-3">
               <ManualUpdateForm projectId={id} />
               <CallNoteForm projectId={id} />

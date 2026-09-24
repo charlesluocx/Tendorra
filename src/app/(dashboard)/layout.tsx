@@ -63,9 +63,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <Link href="/settings/team" className="text-sm text-muted-foreground hover:text-foreground">
               Team
             </Link>
-            <Link href="/settings/inbox" className="text-sm text-muted-foreground hover:text-foreground">
-              Inbox settings
-            </Link>
             <Link href="/settings/usage" className="text-sm text-muted-foreground hover:text-foreground">
               Usage
             </Link>

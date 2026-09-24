@@ -310,53 +310,6 @@ export type Database = {
         }
         Relationships: []
       }
-      company_gmail_inbox: {
-        Row: {
-          access_token: string | null
-          company_id: string
-          connected_at: string
-          connected_by: string | null
-          email_address: string
-          id: string
-          last_synced_at: string | null
-          refresh_token: string | null
-          status: string
-          token_expires_at: string | null
-        }
-        Insert: {
-          access_token?: string | null
-          company_id: string
-          connected_at?: string
-          connected_by?: string | null
-          email_address: string
-          id?: string
-          last_synced_at?: string | null
-          refresh_token?: string | null
-          status?: string
-          token_expires_at?: string | null
-        }
-        Update: {
-          access_token?: string | null
-          company_id?: string
-          connected_at?: string
-          connected_by?: string | null
-          email_address?: string
-          id?: string
-          last_synced_at?: string | null
-          refresh_token?: string | null
-          status?: string
-          token_expires_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "company_gmail_inbox_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: true
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       company_invites: {
         Row: {
           accepted_at: string | null
@@ -426,59 +379,6 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "company_users_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      connected_inboxes: {
-        Row: {
-          access_token: string | null
-          company_id: string
-          connected_at: string
-          email_address: string
-          id: string
-          last_synced_at: string | null
-          ms_account_id: string | null
-          provider: string
-          refresh_token: string | null
-          status: string
-          token_expires_at: string | null
-          user_id: string
-        }
-        Insert: {
-          access_token?: string | null
-          company_id: string
-          connected_at?: string
-          email_address: string
-          id?: string
-          last_synced_at?: string | null
-          ms_account_id?: string | null
-          provider?: string
-          refresh_token?: string | null
-          status?: string
-          token_expires_at?: string | null
-          user_id: string
-        }
-        Update: {
-          access_token?: string | null
-          company_id?: string
-          connected_at?: string
-          email_address?: string
-          id?: string
-          last_synced_at?: string | null
-          ms_account_id?: string | null
-          provider?: string
-          refresh_token?: string | null
-          status?: string
-          token_expires_at?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "connected_inboxes_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
@@ -817,154 +717,76 @@ export type Database = {
           },
         ]
       }
-      project_email_events: {
+      project_email_uploads: {
         Row: {
           activity_id: string | null
           company_id: string
-          created_at: string
-          from_address: string | null
-          gmail_message_id: string
-          id: string
-          parse_status: string
-          parsed_at: string | null
-          project_id: string | null
-          received_at: string | null
-          subject: string | null
-        }
-        Insert: {
-          activity_id?: string | null
-          company_id: string
-          created_at?: string
-          from_address?: string | null
-          gmail_message_id: string
-          id?: string
-          parse_status?: string
-          parsed_at?: string | null
-          project_id?: string | null
-          received_at?: string | null
-          subject?: string | null
-        }
-        Update: {
-          activity_id?: string | null
-          company_id?: string
-          created_at?: string
-          from_address?: string | null
-          gmail_message_id?: string
-          id?: string
-          parse_status?: string
-          parsed_at?: string | null
-          project_id?: string | null
-          received_at?: string | null
-          subject?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "project_email_events_activity_id_fkey"
-            columns: ["activity_id"]
-            isOneToOne: false
-            referencedRelation: "activity_log"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "project_email_events_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "project_email_events_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "project_activity_status"
-            referencedColumns: ["project_id"]
-          },
-          {
-            foreignKeyName: "project_email_events_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      project_outlook_events: {
-        Row: {
-          activity_id: string | null
-          company_id: string
-          connection_id: string | null
-          created_at: string
+          file_name: string | null
           from_address: string | null
           id: string
-          internet_message_id: string
-          ms_message_id: string
+          internet_message_id: string | null
           parse_status: string
           parsed_at: string | null
           project_id: string
           received_at: string | null
           subject: string | null
+          uploaded_at: string
+          uploaded_by: string | null
         }
         Insert: {
           activity_id?: string | null
           company_id: string
-          connection_id?: string | null
-          created_at?: string
+          file_name?: string | null
           from_address?: string | null
           id?: string
-          internet_message_id: string
-          ms_message_id: string
+          internet_message_id?: string | null
           parse_status?: string
           parsed_at?: string | null
           project_id: string
           received_at?: string | null
           subject?: string | null
+          uploaded_at?: string
+          uploaded_by?: string | null
         }
         Update: {
           activity_id?: string | null
           company_id?: string
-          connection_id?: string | null
-          created_at?: string
+          file_name?: string | null
           from_address?: string | null
           id?: string
-          internet_message_id?: string
-          ms_message_id?: string
+          internet_message_id?: string | null
           parse_status?: string
           parsed_at?: string | null
           project_id?: string
           received_at?: string | null
           subject?: string | null
+          uploaded_at?: string
+          uploaded_by?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "project_outlook_events_activity_id_fkey"
+            foreignKeyName: "project_email_uploads_activity_id_fkey"
             columns: ["activity_id"]
             isOneToOne: false
             referencedRelation: "activity_log"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "project_outlook_events_company_id_fkey"
+            foreignKeyName: "project_email_uploads_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "project_outlook_events_connection_id_fkey"
-            columns: ["connection_id"]
-            isOneToOne: false
-            referencedRelation: "connected_inboxes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "project_outlook_events_project_id_fkey"
+            foreignKeyName: "project_email_uploads_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "project_activity_status"
             referencedColumns: ["project_id"]
           },
           {
-            foreignKeyName: "project_outlook_events_project_id_fkey"
+            foreignKeyName: "project_email_uploads_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
@@ -1024,7 +846,6 @@ export type Database = {
           company_id: string
           created_at: string
           current_phase: string | null
-          email_code: string
           id: string
           last_reminder_sent_at: string | null
           name: string
@@ -1038,7 +859,6 @@ export type Database = {
           company_id: string
           created_at?: string
           current_phase?: string | null
-          email_code?: string
           id?: string
           last_reminder_sent_at?: string | null
           name: string
@@ -1052,7 +872,6 @@ export type Database = {
           company_id?: string
           created_at?: string
           current_phase?: string | null
-          email_code?: string
           id?: string
           last_reminder_sent_at?: string | null
           name?: string
@@ -1217,89 +1036,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
-          },
-        ]
-      }
-      tagged_emails: {
-        Row: {
-          activity_id: string | null
-          body_preview: string | null
-          company_id: string
-          connection_id: string | null
-          from_address: string | null
-          id: string
-          internet_message_id: string | null
-          ms_message_id: string
-          parse_status: string
-          parsed_at: string | null
-          project_id: string
-          received_at: string | null
-          subject: string | null
-          tagged_at: string
-          tagged_by: string | null
-        }
-        Insert: {
-          activity_id?: string | null
-          body_preview?: string | null
-          company_id: string
-          connection_id?: string | null
-          from_address?: string | null
-          id?: string
-          internet_message_id?: string | null
-          ms_message_id: string
-          parse_status?: string
-          parsed_at?: string | null
-          project_id: string
-          received_at?: string | null
-          subject?: string | null
-          tagged_at?: string
-          tagged_by?: string | null
-        }
-        Update: {
-          activity_id?: string | null
-          body_preview?: string | null
-          company_id?: string
-          connection_id?: string | null
-          from_address?: string | null
-          id?: string
-          internet_message_id?: string | null
-          ms_message_id?: string
-          parse_status?: string
-          parsed_at?: string | null
-          project_id?: string
-          received_at?: string | null
-          subject?: string | null
-          tagged_at?: string
-          tagged_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tagged_emails_activity_id_fkey"
-            columns: ["activity_id"]
-            isOneToOne: false
-            referencedRelation: "activity_log"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tagged_emails_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tagged_emails_connection_id_fkey"
-            columns: ["connection_id"]
-            isOneToOne: false
-            referencedRelation: "connected_inboxes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tagged_emails_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "project_activity_status"
-            referencedColumns: ["project_id"]
           },
         ]
       }

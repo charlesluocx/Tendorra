@@ -1,16 +1,17 @@
 # Tendorra
 
 Live project-activity tracking for property and construction teams, built on
-top of the existing consultant/RFQ tender workflow: tagged emails, quick call
-notes, and owner-assigned action items all land in one shared feed per
-project, with an automatic flag when a project's gone quiet too long.
+top of the existing consultant/RFQ tender workflow: emails dragged onto a
+project, quick call notes, and owner-assigned action items all land in one
+shared feed per project, with an automatic flag when a project's gone quiet
+too long.
 
 ## Stack
 
 - **Next.js** (App Router) + TypeScript + Tailwind CSS + shadcn/ui
 - **Supabase** (Postgres, Auth, Storage) — schema in `supabase/migrations/`
-- **Microsoft Graph** for connecting a staff member's own Outlook inbox
-- **Cloudflare Workers AI** for turning a tagged email into a structured activity-log entry
+- **mailparser** / **@kenjiuno/msgreader** for reading dragged-in `.eml`/`.msg` email files
+- **Cloudflare Workers AI** for turning a logged email into a structured activity-log entry
 
 ## Development
 
@@ -45,20 +46,17 @@ See `.env.example` for the full list and where to get each value. In short:
 - `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` — already
   filled in `.env.example`; safe to expose to the browser.
 - `SUPABASE_SERVICE_ROLE_KEY` — from the Supabase dashboard. Server-only,
-  bypasses RLS; used for writing OAuth tokens and other trusted operations.
-- `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` / `MICROSOFT_TENANT_ID` —
-  from an Entra ID (Azure AD) app registration. Required for the "Connect
-  Outlook" flow under Inbox Settings.
-- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — from a Google Cloud OAuth
-  client (Gmail API enabled). Required for the shared project-timeline
-  inbox — see "Project timeline" below.
+  bypasses RLS; used for the one write (`ai_usage_log`) that needs it.
 - `CLOUDFLARE_ACCOUNT_ID` / `CLOUDFLARE_API_TOKEN` — required for AI parsing
-  of tagged/synced emails, via Cloudflare Workers AI (free daily allocation,
+  of an uploaded email, via Cloudflare Workers AI (free daily allocation,
   no card required — see `.env.example`).
 
 The app runs and lets you use call notes, manual updates, action items, and
-the checklist without any of the Microsoft/Google/Cloudflare keys — those are
-only needed for the email flows.
+the checklist without the Cloudflare keys. You can still drag an email in
+without them — it's recorded (so dedup still works, and you won't get a
+duplicate once the key is added), but nothing shows up on the visible
+Timeline/Activity Feed until the Cloudflare keys are set, since that entry
+only gets created once AI parsing succeeds.
 
 ## Deployment
 
@@ -127,7 +125,7 @@ not tenant-owned data, so they were left without a `company_id`.
   created together in `src/app/signup/actions.ts` via the service-role
   client (an owner can't satisfy the company-membership RLS check before
   their own membership row exists, so this one write path is trusted server
-  code, same pattern as the OAuth token writes).
+  code, same pattern as other service-role-only writes like `ai_usage_log`).
 - Owner signup takes an optional **company website**. If given,
   `src/lib/branding/extract.ts` best-effort fetches it and pulls a logo
   (favicon/apple-touch-icon/`og:image` from the HTML, falling back to
@@ -170,13 +168,10 @@ not tenant-owned data, so they were left without a `company_id`.
 - `project_checklist_items` — per-project instance of that template,
   seeded automatically when a project is created; tracks `expected_at`
   (planned) separately from `completed_at` (actual).
-- `connected_inboxes` — one row per staff member's connected Outlook
-  account. Access/refresh tokens are readable only by the service role
-  (column-level `GRANT`); the client only ever sees connection status.
-- `tagged_emails` — an email a staff member manually tagged to a project;
-  drives the AI-parsing pipeline into `activity_log`. `internet_message_id`
+- `project_email_uploads` — a log of every email dragged onto a project,
+  driving the AI-parsing pipeline into `activity_log`. `internet_message_id`
   (the email's RFC 5322 Message-ID, shared by every recipient's copy) has a
-  unique index per project so a colleague cc'd on the same email tagging
+  unique index per project so a colleague cc'd on the same email dragging in
   their own copy doesn't record it twice.
 - `project_activity_status` — a view computing `is_stale` per project from
   `companies.stale_after_days` (defaults to 7), used for the "gone quiet"
@@ -190,54 +185,38 @@ not tenant-owned data, so they were left without a `company_id`.
   only for now — there's no cap or per-company billing wired to it yet (see
   "What's not built yet"). Viewable at **`/settings/usage`** (any company
   member; shows this month's token total and the last 100 AI calls).
-- `company_gmail_inbox` — the one shared Gmail connection per company (see
-  "Project timeline" below); tokens are service-role-only, same pattern as
-  `connected_inboxes`.
-- `project_email_events` — a processing log of every Gmail message pulled
-  in, deduped by `gmail_message_id`, with `parse_status` (`parsed` /
-  `failed` / `unmatched` if no project's `email_code` was found in the
-  message).
-- `project_outlook_events` — a processing log of Outlook messages pulled in
-  by the category-based sync (see "Project timeline" below), deduped by
-  `internet_message_id` per `(company_id, project_id)` so a colleague cc'd
-  on the same email and tagging it with the same category in their own
-  inbox doesn't record it twice; `parse_status` is `pending` / `parsed` /
-  `failed`.
 
 ## Project timeline
 
-Every project gets a unique, auto-generated `email_code` (`projects` table),
-reused as both a Gmail "+" tag and an Outlook category name — three ways to
-get an email onto a project's timeline, in increasing order of automation:
+Every project's page has a drag-and-drop zone
+(`src/components/project/email-dropzone.tsx`): drop an email file onto it
+and it's read, AI-summarized, and logged straight to that project — no
+inbox connection, no OAuth, no scheduled sync job.
 
-1. **Manually tag one email** — connect your own Outlook at
-   `/settings/inbox`, then use **"Tag an email →"** on a project page to
-   pick one of your recent messages. Immediate, per-email, no setup beyond
-   connecting.
-2. **Forward/CC the project's Gmail address** — an owner/admin connects one
-   shared Gmail inbox for the whole company (Google OAuth,
-   `src/lib/gmail.ts` + `src/app/api/auth/gmail/start`+`callback`, separate
-   from the per-staff Outlook connection above). Each project's page shows
-   its address (e.g. `company-timeline+A1B2C3@gmail.com`) with a copy
-   button; `POST /api/cron/sync-gmail` (every 10 minutes via
-   `.github/workflows/sync-gmail.yml`) matches the `+code` and parses it in.
-3. **Tag by Outlook category, automatically** — each project's page also
-   shows its `email_code` as an Outlook category name to copy. Any staff
-   member with their own Outlook connected (from option 1) can apply that
-   category to emails as they read them, with zero further action: `POST
-   /api/cron/sync-outlook-categories` (every 10 minutes via
-   `.github/workflows/sync-outlook-categories.yml`) calls
-   `listMessagesByCategory` (`src/lib/microsoft-graph.ts`), which filters
-   by category **server-side via Microsoft Graph** — mail without that
-   category is never fetched, so this reads nothing beyond what was
-   deliberately tagged.
-
-Options 1 and 3 both dedupe by the email's RFC 5322 Message-ID
-(`internetMessageId`), not Graph's per-mailbox message id — the id every
-recipient's copy shares — so when several staff are cc'd on one email and
-each tags/categorizes their own copy, it's still recorded on the timeline
-exactly once (`tagged_emails.internet_message_id`,
-`project_outlook_events.internet_message_id`).
+- **Drag straight from Outlook desktop** — in Chrome/Edge on Windows,
+  dragging an email out of the classic Outlook app produces a virtual
+  `.msg` file the browser can read directly, no save step needed.
+- **Or drop a saved file** — Gmail's "Show original" → download, or
+  Outlook's "Save As" both produce a `.eml` file that works the same way.
+- Parsing (`src/lib/email-file-parser.ts`) sniffs the file's content (the
+  OLE/CFBF magic bytes for `.msg`, otherwise plain MIME) rather than
+  trusting the extension, since a dragged virtual file's name isn't always
+  reliable: `.msg` goes through `@kenjiuno/msgreader`, `.eml` through
+  `mailparser`.
+- The upload is scoped to whichever project's page it landed on — no
+  project code to match, since the drop target already says which project.
+- Dedupes by the email's RFC 5322 Message-ID (`internetMessageId`/
+  `messageId`, shared by every recipient's copy), not any per-mailbox id —
+  so if several staff are cc'd on one email and each drags in their own
+  copy, it's recorded on the timeline exactly once
+  (`project_email_uploads.internet_message_id`).
+- The server action (`uploadEmailFile` in `src/app/(dashboard)/projects/
+  [id]/actions.ts`) runs the AI parsing (Cloudflare Workers AI) inline and
+  writes straight to `activity_log` — no processing queue, no polling.
+- Not yet verified running on the actual Cloudflare Workers runtime (only
+  local `next dev` so far) — `mailparser` pulls in a few Node built-ins
+  that OpenNext's Cloudflare adapter usually polyfills, but this hasn't
+  been confirmed end-to-end post-deploy.
 
 The **Timeline** section on each project page (`src/components/project/
 timeline.tsx`) plots that project's `activity_log` entries alongside its
